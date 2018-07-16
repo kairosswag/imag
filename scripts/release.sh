@@ -63,6 +63,7 @@ CRATES=(
     ./bin/core/imag-ids
     ./bin/core/imag-git
     ./bin/core/imag-category
+    ./bin/core/imag-entry
     ./bin/core/imag
 )
 
