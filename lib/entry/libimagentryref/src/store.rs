@@ -18,7 +18,10 @@
 //
 
 use std::path::Path;
+use std::path::PathBuf;
 
+use libimagstore::store::FileLockEntry;
+use libimagstore::store::Store;
 use libimagstore::storeid::StoreId;
 
 use refstore::UniqueRefPathGenerator;
@@ -43,5 +46,6 @@ impl UniqueRefPathGenerator for Base {
     fn postprocess_storeid(sid: StoreId) -> Result<StoreId> {
         Ok(sid) // default implementation
     }
+
 }
 

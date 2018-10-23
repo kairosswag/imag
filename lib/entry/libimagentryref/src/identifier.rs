@@ -17,36 +17,14 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 //
 
-#![recursion_limit="256"]
+use std::path::PathBuf;
 
-#![deny(
-    dead_code,
-    non_camel_case_types,
-    non_snake_case,
-    path_statements,
-    trivial_numeric_casts,
-    unstable_features,
-    unused_allocation,
-    unused_import_braces,
-    unused_imports,
-    unused_must_use,
-    unused_mut,
-    unused_qualifications,
-    while_true,
-)]
-
-#[macro_use] extern crate log;
-extern crate itertools;
-extern crate toml;
-extern crate toml_query;
-
-#[macro_use] extern crate libimagstore;
-extern crate libimagerror;
-#[macro_use] extern crate libimagentryutil;
-extern crate failure;
-
-module_entry_path_mod!("ref");
-
-pub mod reference;
-pub mod store;
+/// A identifier for telling libimagentryref what to search for
+///
+/// An entry can either be identified by its hash or by its (relative) path.
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum Identifier {
+    Hash(String),
+    Path(PathBuf)
+}
 

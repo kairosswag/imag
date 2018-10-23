@@ -34,13 +34,3 @@ libimagstore     = { version = "0.10.0", path = "../../../lib/core/libimagstore"
 libimagerror     = { version = "0.10.0", path = "../../../lib/core/libimagerror" }
 libimagentryutil = { version = "0.10.0", path = "../../../lib/entry/libimagentryutil" }
 
-[features]
-default             = []
-generators          = []
-generators-sha1     = ["sha-1", "hex"]
-generators-sha224   = ["sha2", "hex"]
-generators-sha256   = ["sha2", "hex"]
-generators-sha384   = ["sha2", "hex"]
-generators-sha512   = ["sha2", "hex"]
-generators-sha3     = ["sha3", "hex"]
-
