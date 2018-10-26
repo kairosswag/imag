@@ -218,6 +218,19 @@ impl IntoStoreId for PathBuf {
     }
 }
 
+pub trait IntoStoreIdIter {
+    fn into_storeid_iter(self) -> StoreIdIterator;
+}
+
+impl<I> IntoStoreIdIter for I
+    where I: Iterator<Item = PathBuf>
+{
+    fn into_storeid_iter(self) -> StoreIdIterator {
+        let it = self.map(|p| p.into_storeid());
+        StoreIdIterator::new(Box::new(it))
+    }
+}
+
 #[macro_export]
 macro_rules! module_entry_path_mod {
     ($name:expr) => (
