@@ -20,7 +20,7 @@
 use libimagstore::store::FileLockEntry;
 use libimagrt::runtime::Runtime;
 
-pub fn process_content<'a, I>(rt: &Runtime, iter: I)
+pub fn process_content<'a, I>(rt: &Runtime, iter: I) -> i32
     where I: Iterator<Item = FileLockEntry<'a>>
 {
     match rt.cli()

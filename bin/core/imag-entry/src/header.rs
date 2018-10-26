@@ -27,11 +27,11 @@ use libimagstore::store::FileLockEntry;
 use libimagrt::runtime::Runtime;
 use libimagerror::io::ToExitCode;
 use libimagerror::trace::MapErrTrace;
-use libimagerror::exit::ExitUnwrap;
+use libimagerror::exit::ExitCode;
 
 use toml_query::read::TomlValueReadExt;
 
-pub fn process_headers<'a, I>(rt: &Runtime, iter: I)
+pub fn process_headers<'a, I>(rt: &Runtime, iter: I) -> i32
     where I: Iterator<Item = FileLockEntry<'a>>
 {
     match rt.cli()
@@ -52,35 +52,37 @@ pub fn process_headers<'a, I>(rt: &Runtime, iter: I)
     }
 }
 
-fn read<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I)
+fn read<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
     where I: Iterator<Item = FileLockEntry<'e>>
 {
     let header_path = mtch.value_of("header-value-path").unwrap(); // safe by clap
     let mut output  = ::std::io::stdout();
 
-    iter.for_each(|entry| {
+    iter.fold(0, |accu, entry| {
         entry.get_header()
             .read(header_path)
             .map_err_trace_exit_unwrap(1)
             .map(|value| {
                 writeln!(output, "{}", value)
                     .to_exit_code()
-                    .unwrap_or_exit();
+                    .map(|_| accu)
+                    .unwrap_or_else(ExitCode::code)
             })
             .unwrap_or_else(|| {
                 // if value not present and configured
                 error!("Value not present for entry {} at {}", entry.get_location(), header_path);
+                1
             })
     })
 }
 
-fn has<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I)
+fn has<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
     where I: Iterator<Item = FileLockEntry<'e>>
 {
     let header_path = mtch.value_of("header-value-path").unwrap(); // safe by clap
     let mut output  = ::std::io::stdout();
 
-    iter.for_each(|entry| {
+    iter.fold(0, |accu, entry| {
         let value = entry.get_header()
             .read(header_path)
             .map_err_trace_exit_unwrap(1)
@@ -88,17 +90,18 @@ fn has<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I)
 
         writeln!(output, "{} - {}", entry.get_location(), value)
             .to_exit_code()
-            .unwrap_or_exit();
+            .map(|_| accu)
+            .unwrap_or_else(ExitCode::code)
     })
 }
 
-fn hasnt<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I)
+fn hasnt<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
     where I: Iterator<Item = FileLockEntry<'e>>
 {
     let header_path = mtch.value_of("header-value-path").unwrap(); // safe by clap
     let mut output  = ::std::io::stdout();
 
-    iter.for_each(|entry| {
+    iter.fold(0, |accu, entry| {
         let value = entry.get_header()
             .read(header_path)
             .map_err_trace_exit_unwrap(1)
@@ -106,7 +109,8 @@ fn hasnt<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I)
 
         writeln!(output, "{} - {}", entry.get_location(), value)
             .to_exit_code()
-            .unwrap_or_exit();
+            .map(|_| accu)
+            .unwrap_or_else(ExitCode::code)
     })
 }
 
@@ -121,7 +125,7 @@ macro_rules! implement_compare {
     }
 }
 
-fn int<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I)
+fn int<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
     where I: Iterator<Item = FileLockEntry<'e>>
 {
     let header_path = mtch.value_of("header-value-path").unwrap(); // safe by clap
@@ -147,7 +151,7 @@ fn int<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I)
             implement_compare!(mtch, "header-int-gte", i64, |cmp| *i >= cmp)
         });
 
-    iter.for_each(|entry| {
+    iter.fold(0, |accu, entry| {
         if let Some(v) = entry.get_header()
             .read(header_path)
             .map_err_trace_exit_unwrap(1)
@@ -156,17 +160,16 @@ fn int<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I)
                 ::toml::Value::Integer(i) => if filter.filter(&i) {
                     writeln!(output, "{} - {}", entry.get_location(), i)
                         .to_exit_code()
-                        .unwrap_or_exit();
-                },
-                _ => {
-                    // nothing
-                }
+                        .map(|_| accu)
+                        .unwrap_or_else(ExitCode::code)
+                } else { 1 },
+                _ => 1
             }
-        }
+        } else { 1 }
     })
 }
 
-fn float<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I)
+fn float<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
     where I: Iterator<Item = FileLockEntry<'e>>
 {
     let header_path = mtch.value_of("header-value-path").unwrap(); // safe by clap
@@ -192,7 +195,7 @@ fn float<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I)
             implement_compare!(mtch, "header-float-gte", f64, |cmp| *i >= cmp)
         });
 
-    iter.for_each(|entry| {
+    iter.fold(0, |accu, entry| {
         if let Some(v) = entry.get_header()
             .read(header_path)
             .map_err_trace_exit_unwrap(1)
@@ -201,17 +204,16 @@ fn float<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I)
                 ::toml::Value::Float(i) => if filter.filter(&i) {
                     writeln!(output, "{} - {}", entry.get_location(), i)
                         .to_exit_code()
-                        .unwrap_or_exit();
-                },
-                _ => {
-                    // nothing
-                }
+                        .map(|_| accu)
+                        .unwrap_or_else(ExitCode::code)
+                } else { 1 },
+                _ => 1
             }
-        }
+        } else { 1 }
     })
 }
 
-fn string<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I)
+fn string<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
     where I: Iterator<Item = FileLockEntry<'e>>
 {
     let header_path = mtch.value_of("header-value-path").unwrap(); // safe by clap
@@ -225,7 +227,7 @@ fn string<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I)
             implement_compare!(mtch, "header-string-neq", String, |cmp| *i != cmp)
         });
 
-    iter.for_each(|entry| {
+    iter.fold(0, |accu, entry| {
         if let Some(v) = entry.get_header()
             .read(header_path)
             .map_err_trace_exit_unwrap(1)
@@ -234,17 +236,16 @@ fn string<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I)
                 ::toml::Value::String(s) => if filter.filter(&s) {
                     writeln!(output, "{} - {}", entry.get_location(), s)
                         .to_exit_code()
-                        .unwrap_or_exit();
-                },
-                _ => {
-                    // nothing
-                }
+                        .map(|_| accu)
+                        .unwrap_or_else(ExitCode::code)
+                } else { 1 },
+                _ => 1
             }
-        }
+        } else { 1 }
     })
 }
 
-fn boolean<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I)
+fn boolean<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
     where I: Iterator<Item = FileLockEntry<'e>>
 {
     let header_path = mtch.value_of("header-value-path").unwrap(); // safe by clap
@@ -254,7 +255,7 @@ fn boolean<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I)
         .and(|i: &bool| -> bool { *i })
         .and(|i: &bool| -> bool { *i });
 
-    iter.for_each(|entry| {
+    iter.fold(0, |accu, entry| {
         if let Some(v) = entry.get_header()
             .read(header_path)
             .map_err_trace_exit_unwrap(1)
@@ -263,13 +264,12 @@ fn boolean<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I)
                 ::toml::Value::Boolean(b) => if filter.filter(&b) {
                     writeln!(output, "{} - {}", entry.get_location(), b)
                         .to_exit_code()
-                        .unwrap_or_exit();
-                },
-                _ => {
-                    // nothing
-                }
+                        .map(|_| accu)
+                        .unwrap_or_else(ExitCode::code)
+                } else { 1 },
+                _ => 1
             }
-        }
+        } else { 1 }
     })
 }
 

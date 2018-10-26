@@ -98,7 +98,7 @@ fn main() {
         .trace_unwrap_exit(1)
         .filter_map(|x| x);
 
-    rt.cli()
+    let exit_code = rt.cli()
         .subcommand_name()
         .map(|name| {
             match name {
@@ -107,12 +107,15 @@ fn main() {
                 "exec"    => exec::process_exec(&rt, iter),
                 other     => {
                     debug!("Unknown command");
-                    let _ = rt.handle_unknown_subcommand("imag-category", other, rt.cli())
+                    rt.handle_unknown_subcommand("imag-category", other, rt.cli())
                         .map_err_trace_exit_unwrap(1)
                         .code()
-                        .map(::std::process::exit);
+                        .unwrap_or(1)
                 },
             }
-        });
+        })
+        .unwrap_or(1);
+
+    ::std::process::exit(exit_code)
 }
 
