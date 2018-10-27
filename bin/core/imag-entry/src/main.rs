@@ -66,8 +66,11 @@ fn main() {
                                     "Plumbing tool for reading/writing structured data in entries",
                                     ui::build_ui);
 
-    let list_output_with_ids = rt.cli().is_present("list-id");
+    let list_output_with_ids     = rt.cli().is_present("list-id");
     let list_output_with_ids_fmt = rt.cli().value_of("list-id-format");
+
+    trace!("list_output_with_ids     = {:?}", list_output_with_ids );
+    trace!("list_output_with_ids_fmt = {:?}", list_output_with_ids_fmt);
 
     let sids = match rt.cli().value_of("entry") {
         Some(path) => vec![PathBuf::from(path).into_storeid().map_err_trace_exit_unwrap(1)],

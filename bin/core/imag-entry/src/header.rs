@@ -34,6 +34,7 @@ use toml_query::read::TomlValueReadExt;
 pub fn process_headers<'a, I>(rt: &Runtime, iter: I) -> i32
     where I: Iterator<Item = FileLockEntry<'a>>
 {
+    debug!("Processing headers");
     match rt.cli()
         .subcommand_matches("header")
         .unwrap() // safe by main()
@@ -55,14 +56,17 @@ pub fn process_headers<'a, I>(rt: &Runtime, iter: I) -> i32
 fn read<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
     where I: Iterator<Item = FileLockEntry<'e>>
 {
-    let header_path = mtch.value_of("header-value-path").unwrap(); // safe by clap
+    debug!("Processing headers: reading value");
+    let header_path = get_header_path(mtch, "header-value-path");
     let mut output  = ::std::io::stdout();
 
     iter.fold(0, |accu, entry| {
+        trace!("Processing headers: working on {:?}", entry.get_location());
         entry.get_header()
             .read(header_path)
             .map_err_trace_exit_unwrap(1)
             .map(|value| {
+                trace!("Processing headers: Got value {:?}", value);
                 writeln!(output, "{}", value)
                     .to_exit_code()
                     .map(|_| accu)
@@ -79,10 +83,12 @@ fn read<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
 fn has<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
     where I: Iterator<Item = FileLockEntry<'e>>
 {
-    let header_path = mtch.value_of("header-value-path").unwrap(); // safe by clap
+    debug!("Processing headers: has value");
+    let header_path = get_header_path(mtch, "header-value-path");
     let mut output  = ::std::io::stdout();
 
     iter.fold(0, |accu, entry| {
+        trace!("Processing headers: working on {:?}", entry.get_location());
         let value = entry.get_header()
             .read(header_path)
             .map_err_trace_exit_unwrap(1)
@@ -98,10 +104,12 @@ fn has<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
 fn hasnt<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
     where I: Iterator<Item = FileLockEntry<'e>>
 {
-    let header_path = mtch.value_of("header-value-path").unwrap(); // safe by clap
+    debug!("Processing headers: hasnt value");
+    let header_path = get_header_path(mtch, "header-value-path");
     let mut output  = ::std::io::stdout();
 
     iter.fold(0, |accu, entry| {
+        trace!("Processing headers: working on {:?}", entry.get_location());
         let value = entry.get_header()
             .read(header_path)
             .map_err_trace_exit_unwrap(1)
@@ -115,20 +123,23 @@ fn hasnt<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
 }
 
 macro_rules! implement_compare {
-    { $mtch: ident, $path: expr, $t: ty, $compare: expr } => {
+    { $mtch: ident, $path: expr, $t: ty, $compare: expr } => {{
+        trace!("Getting value at {}, comparing as {}", $path, stringify!($t));
         if let Some(cmp) = $mtch.value_of($path).map(FromStr::from_str) {
             let cmp : $t = cmp.unwrap(); // safe by clap
+            trace!("Getting value at {} = {}", $path, cmp);
             $compare(cmp)
         } else {
             true
         }
-    }
+    }}
 }
 
 fn int<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
     where I: Iterator<Item = FileLockEntry<'e>>
 {
-    let header_path = mtch.value_of("header-value-path").unwrap(); // safe by clap
+    debug!("Processing headers: int value");
+    let header_path = get_header_path(mtch, "header-value-path");
     let mut output  = ::std::io::stdout();
 
     let filter = ::filters::ops::bool::Bool::new(true)
@@ -152,6 +163,7 @@ fn int<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
         });
 
     iter.fold(0, |accu, entry| {
+        trace!("Processing headers: working on {:?}", entry.get_location());
         if let Some(v) = entry.get_header()
             .read(header_path)
             .map_err_trace_exit_unwrap(1)
@@ -172,7 +184,8 @@ fn int<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
 fn float<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
     where I: Iterator<Item = FileLockEntry<'e>>
 {
-    let header_path = mtch.value_of("header-value-path").unwrap(); // safe by clap
+    debug!("Processing headers: float value");
+    let header_path = get_header_path(mtch, "header-value-path");
     let mut output  = ::std::io::stdout();
 
     let filter = ::filters::ops::bool::Bool::new(true)
@@ -196,6 +209,7 @@ fn float<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
         });
 
     iter.fold(0, |accu, entry| {
+        trace!("Processing headers: working on {:?}", entry.get_location());
         if let Some(v) = entry.get_header()
             .read(header_path)
             .map_err_trace_exit_unwrap(1)
@@ -216,7 +230,8 @@ fn float<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
 fn string<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
     where I: Iterator<Item = FileLockEntry<'e>>
 {
-    let header_path = mtch.value_of("header-value-path").unwrap(); // safe by clap
+    debug!("Processing headers: string value");
+    let header_path = get_header_path(mtch, "header-value-path");
     let mut output  = ::std::io::stdout();
 
     let filter = ::filters::ops::bool::Bool::new(true)
@@ -228,6 +243,7 @@ fn string<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
         });
 
     iter.fold(0, |accu, entry| {
+        trace!("Processing headers: working on {:?}", entry.get_location());
         if let Some(v) = entry.get_header()
             .read(header_path)
             .map_err_trace_exit_unwrap(1)
@@ -248,7 +264,8 @@ fn string<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
 fn boolean<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
     where I: Iterator<Item = FileLockEntry<'e>>
 {
-    let header_path = mtch.value_of("header-value-path").unwrap(); // safe by clap
+    debug!("Processing headers: bool value");
+    let header_path = get_header_path(mtch, "header-value-path");
     let mut output  = ::std::io::stdout();
 
     let filter = ::filters::ops::bool::Bool::new(true)
@@ -256,6 +273,7 @@ fn boolean<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
         .and(|i: &bool| -> bool { *i });
 
     iter.fold(0, |accu, entry| {
+        trace!("Processing headers: working on {:?}", entry.get_location());
         if let Some(v) = entry.get_header()
             .read(header_path)
             .map_err_trace_exit_unwrap(1)
@@ -271,5 +289,15 @@ fn boolean<'a, 'e, I>(rt: &Runtime, mtch: &ArgMatches<'a>, iter: I) -> i32
             }
         } else { 1 }
     })
+}
+
+
+
+// helpers
+//
+fn get_header_path<'a>(mtch: &'a ArgMatches<'a>, path: &'static str) -> &'a str {
+    let header_path = mtch.value_of(path).unwrap(); // safe by clap
+    debug!("Processing headers: header path = {}", header_path);
+    header_path
 }
 
