@@ -43,6 +43,7 @@ libimagentryref does store the following data:
 [ref]
 filehash.sha1 = "<sha1 hash of the file>"
 relpath = "/Psy_trance_2018_yearmix.mp3"
+collection = "music"
 ```
 
 The filehash is stored so that libimagentryref can re-find the file whenever it
@@ -50,10 +51,19 @@ was moved. The `sha1` key is added to be able to upgrade hashes later to other
 hashing algorithms.
 `relpath` is the part of the path that when joined with the "base" path from
 the configuration results in the full path of the file for the current machine.
+The "collection" key hints to the configuration key in the imag config file.
 
-libimagentryref provides functionality to get the file. 
+The configuration section for the collections looks like this:
+
+```toml
+[entryref.collections]
+music = "/home/alice/music"
+documents = "/home/alice/doc"
+```
+
+libimagentryref provides functionality to get the file.
 libimagentryref also offers functionality to find files _only_ using their
-filename or filehash and correct the filehash or filename respectively
+filename (x)or filehash and correct the filehash or filename respectively
 (automatically or explicitely).
 
 
