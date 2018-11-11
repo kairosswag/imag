@@ -45,18 +45,22 @@ filehash.sha1 = "<sha1 hash of the file>"
 relpath = "/Psy_trance_2018_yearmix.mp3"
 ```
 
-libimagentryref provides functionality to get the file. It also offers
-abstractions so that a user of the library knows whether libimagentryref fetched
-the file based on the hash sum (so that the file is actually the expected one)
-or only a file which appears to have the same name as the stored name.
-This is useful for telling the user what happened.
+The filehash is stored so that libimagentryref can re-find the file whenever it
+was moved. The `sha1` key is added to be able to upgrade hashes later to other
+hashing algorithms.
+`relpath` is the part of the path that when joined with the "base" path from
+the configuration results in the full path of the file for the current machine.
 
+libimagentryref provides functionality to get the file. 
 libimagentryref also offers functionality to find files _only_ using their
-filename or filehash and correct the filehash or filename respectively.
+filename or filehash and correct the filehash or filename respectively
+(automatically or explicitely).
 
 
 ### Limits
 
 As soon as the file is renamed _and_ modified, this fails.
+This does also not cover the use case where the same file has different names on
+different machines.
 
 
