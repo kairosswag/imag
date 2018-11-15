@@ -25,10 +25,7 @@ log = "0.4.0"
 toml = "0.4"
 toml-query = "0.8"
 failure = "0.1"
-sha-1 = { version = "0.7", optional = true }
-sha2 = { version = "0.7", optional = true }
-sha3 = { version = "0.7", optional = true }
-hex = { version = "0.3", optional = true }
+sha-1 = "0.8"
 
 libimagstore     = { version = "0.10.0", path = "../../../lib/core/libimagstore" }
 libimagerror     = { version = "0.10.0", path = "../../../lib/core/libimagerror" }

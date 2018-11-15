@@ -136,7 +136,7 @@ impl<H, C> Ref<H, C> for Entry
                     Error::from(EM::EntryHeaderTypeError2("ref.hash.<hash>", "string"))
                 })
             })
-            .and_then(|hash| H::hash(path).map(|h| h == hash))
+            .and_then(|hash| H::hash(file_path).map(|h| h == hash))
     }
 
     fn remove_ref(&mut self) -> Result<()> {
@@ -160,7 +160,7 @@ impl<H, C> Ref<H, C> for Entry
         where P: AsRef<Path> + Debug,
               Coll: AsRef<str> + Debug
     {
-        if self.is::<IsRef>()? {
+        if !force && self.is::<IsRef>()? {
             let _ = Err(err_msg("Entry is already a reference")).context("Making ref out of entry")?;
         }
 
@@ -195,7 +195,11 @@ impl Hasher for Sha1Hasher {
     const NAME : &'static str = "sha1";
 
     fn hash<P: AsRef<Path>>(path: P) -> Result<String> {
-        unimplemented!()
+        use sha1::{Sha1, Digest};
+
+        let mut hasher = Sha1::new();
+        hasher.input(::std::fs::read_to_string(path)?);
+        String::from_utf8(hasher.result().as_slice().to_vec()).map_err(Error::from)
     }
 }
 
