@@ -122,7 +122,11 @@ pub<H, P> impl Ref<H, P> for Entry {
     }
 
     fn remove_ref(&mut self) -> Result<()>; {
-        unimplemented!()
+        debug!("Removing 'ref' header section");
+        let _ = self.get_header_mut().delete("ref").context("Removing ref")?;
+
+        debug!("Removing 'ref' header marker");
+        entry.set_isflag::<IsRef>().context("Removing ref").map_err(Error::from)
     }
 
     /// Make a ref out of a normal (non-ref) entry.
@@ -138,35 +142,38 @@ pub<H, P> impl Ref<H, P> for Entry {
               C: AsRef<str>
     {
         if self.is_ref()? {
-            return Err(Error::from(err_msg("Entry is already a reference")))
+            let _ = Error::from(err_msg("Entry is already a reference"))
+                .context("Making ref out of entry")?;
         }
 
         let collection_config_path = format!("{}/{}", P::CONFIG_COLLECTIONS_PATH, collection_name);
         let mut file_path          = configuration
-            .read(collection_config_path)?
+            .read(collection_config_path)
+            .context("Making ref out of entry")?
             .ok_or_else(|| {
                 let msg = format_err!("Configuration missing at '{}'", collection_config_path);
                 Error::from(msg)
-            })?
-            .as_str()
-            .map(String::from)
-            .map(PathBuf::from)
-            .ok_or_else(|| {
+            })
+            .and_then(|v| v.as_str().ok_or_else(|| {
                 let msg = format_err!("Configuration type at '{}' should be 'string'", collection_config_path);
                 Error::from(msg)
-            })?
+            })
+            .map(String::from)
+            .map(PathBuf::from)
+            .context("Making ref out of entry")?
             .join(path);
 
         if !filepath.exists() {
             let msg = format_err!("File '{}' does not exist", file_path);
-            return Err(Error::from(msg))
+            let _   = Error::from(msg).context("Making ref out of entry")?;
         }
 
-        let hash   = H::hash(&filepath)?;
-        let header = make_header_section(hash, H::NAME, path, collcetion_name)?;
-        let _      = self.get_header_mut().insert("ref", header)?;
+        let _ = H::hash(&filepath)
+            .and_then(|hash| make_header_section(hash, H::NAME, path, collcetion_name))
+            .and_then(|h| self.get_header_mut().insert("ref", h).map_err(Error::from))
+            .and_then(|_| self.set_isflag::<IsRef>())
+            .context("Making ref out of entry")?;
 
-        entry.set_isflag::<IsRef>()?;
         Ok(())
     }
 
