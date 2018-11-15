@@ -24,28 +24,37 @@ use libimagstore::store::FileLockEntry;
 use libimagstore::store::Store;
 use libimagstore::storeid::StoreId;
 
-use refstore::UniqueRefPathGenerator;
-
+use toml::Value;
 use failure::Fallible as Result;
 
-/// A base UniqueRefPathGenerator which must be overridden by the actual UniqueRefPathGenerator
-/// which is provided by this crate
-#[allow(dead_code)]
-pub struct Base;
 
-impl UniqueRefPathGenerator for Base {
-    fn collection() -> &'static str {
-        "ref"
-    }
+pub trait RefStore<'a> {
+    fn get_ref(&self, id: StoreId) -> Result<Option<FileLockEntry<'a>>>;
 
-    fn unique_hash<A: AsRef<Path>>(_path: A) -> Result<String> {
-        // This has to be overridden
-        panic!("Not overridden base functionality. This is a BUG!")
-    }
+    fn create_ref(&self, id: StoreId, config: &Value, pathpart: &PathBuf)
+        -> Result<FileLockEntry<'a>>;
 
-    fn postprocess_storeid(sid: StoreId) -> Result<StoreId> {
-        Ok(sid) // default implementation
-    }
-
+    fn retrieve_ref(&self, id: StoreId, config: &Value, pathpart: &PathBuf)
+        -> Result<FileLockEntry<'a>>;
 }
 
+impl<'a> RefStore<'a> for Store {
+    /// Get a Ref object from the Store.
+    ///
+    /// If the entry exists in the store, but the entry is not a ref, this returns an error.
+    fn get_ref(&self, id: StoreId) -> Result<Option<FileLockEntry<'a>>> {
+    }
+
+    fn create_ref(&self, id: StoreId, config: &Value, pathpart: &PathBuf) -> Result<FileLockEntry<'a>> {
+    }
+
+    /// Retrieve a Ref object from the Store.
+    ///
+    /// If the entry exists in the store, but the entry is not a ref, this returns an error.
+    fn retrieve_ref(&self, id: StoreId, config: &Value, pathpart: &PathBuf) -> Result<FileLockEntry<'a>> {
+        match self.get_ref(id)? {
+            Some(r) => Ok(r),
+            None    => self.create_ref(id, config, pathpart),
+        }
+    }
+}

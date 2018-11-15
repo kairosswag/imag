@@ -34,7 +34,10 @@ use failure::Error;
 
 use refstore::UniqueRefPathGenerator;
 
-pub trait Ref {
+pub<H, P> trait Ref<H, P>
+    where H: Hasher = Sha1Hasher,
+          P: ConfigPathProvider = DefaultConfigPathProvider,
+{
 
     /// Check whether the underlying object is actually a ref
     fn is_ref(&self) -> Result<bool>;
@@ -46,15 +49,24 @@ pub trait Ref {
     fn get_stored_path(&self) -> Result<PathBuf>;
 
     /// Check whether the referenced file still matches its hash
-    fn hash_valid<RPG: UniqueRefPathGenerator>(&self) -> Result<bool>;
+    fn hash_valid<C>(&self) -> Result<bool>
+        where C: AsRef<str>;
 
     fn remove_ref(&mut self) -> Result<()>;
 
+    /// Make a ref out of a normal (non-ref) entry.
+    ///
+    /// If the entry is already a ref, this fails if `force` is false
+    fn make_ref<P, C>(&mut self, force: bool, path: P, config: &Value) -> Result<()>
+        where P: AsRef<Path>,
+              C: AsRef<str>;
 }
 
 provide_kindflag_path!(pub IsRef, "ref.is_ref");
 
-impl Ref for Entry {
+pub<H, P> impl Ref<H, P> for Entry {
+    where H: Hasher = Sha1Hasher,
+          P: ConfigPathProvider = DefaultConfigPathProvider,
 
     /// Check whether the underlying object is actually a ref
     fn is_ref(&self) -> Result<bool> {
@@ -62,28 +74,18 @@ impl Ref for Entry {
     }
 
     fn get_hash(&self) -> Result<&str> {
+        let header_path = format!("ref.hash.{}", H::NAME);
         self.get_header()
-            .read("ref.hash")
+            .read(&header_path)
             .map_err(Error::from)?
-            .ok_or_else(|| Error::from(EM::EntryHeaderFieldMissing("ref.hash")))
-            .and_then(|v| {
-                v.as_str().ok_or_else(|| Error::from(EM::EntryHeaderTypeError2("ref.hash", "string")))
+            .ok_or_else(|| {
+                Error::from(EM::EntryHeaderFieldMissing(header_path.to_owned()))
             })
-    }
-
-    fn make_ref<P: AsRef<Path>>(&mut self, hash: String, path: P) -> Result<()> {
-        let path_str : String = path
-            .as_ref()
-            .to_str()
-            .map(String::from)
-            .ok_or_else(|| EM::UTF8Error)?;
-
-        let _   = self.set_isflag::<IsRef>()?;
-        let hdr = self.get_header_mut();
-        hdr.insert("ref.path", Value::String(String::from(path_str)))?;
-        hdr.insert("ref.hash", Value::String(hash))?;
-
-        Ok(())
+            .and_then(|v| {
+                v.as_str().ok_or_else(|| {
+                    Error::from(EM::EntryHeaderTypeError2(header_path.to_owned(), "string"))
+                })
+            })
     }
 
     fn get_path(&self) -> Result<PathBuf> {
@@ -99,17 +101,86 @@ impl Ref for Entry {
             .map(PathBuf::from)
     }
 
-    fn hash_valid<RPG: UniqueRefPathGenerator>(&self) -> Result<bool> {
-        self.get_path()
-            .map(PathBuf::from)
-            .map_err(Error::from)
-            .and_then(|pb| RPG::unique_hash(pb))
-            .and_then(|h| Ok(h == self.get_hash()?))
+    fn hash_valid<C>(&self, collection_name: C) -> Result<bool>
+        where C: AsRef<str>
+    {
+        let header_path = format!("ref.hash.{}", H::NAME);
+        let path = self.get_path()?;
+
+        self.get_header()
+            .read(&header_path)
+            .map_err(Error::from)?
+            .ok_or_else(|| {
+                Error::from(EM::EntryHeaderFieldMissing(header_path.to_owned()))
+            })
+            .and_then(|v| {
+                v.as_str().ok_or_else(|| {
+                    Error::from(EM::EntryHeaderTypeError2(header_path.to_owned(), "string"))
+                })
+            })
+            .and_then(|hash| H::hash(path)? == hash)
     }
 
     fn remove_ref(&mut self) -> Result<()>; {
         unimplemented!()
     }
 
+    /// Make a ref out of a normal (non-ref) entry.
+    ///
+    /// `path` is the path to refer to,
+    ///
+    /// # Warning
+    ///
+    /// If the entry is already a ref, this fails if `force` is false
+    ///
+    fn make_ref<P, C>(&mut self, path: P, collection_name: S, config: &Value, force: bool) -> Result<()>
+        where P: AsRef<Path>,
+              C: AsRef<str>
+    {
+        if self.is_ref()? {
+            return Err(Error::from(err_msg("Entry is already a reference")))
+        }
+
+        let collection_config_path = format!("{}/{}", P::CONFIG_COLLECTIONS_PATH, collection_name);
+        let file_path_directory = config.read(collection_config_path)?; // TODO
+
+        let filepath = format!("{}/{}", file_path_directory, path);
+        let hash = H::hash(filepath);
+
+        // TODO
+
+        entry.set_isflag::<IsRef>()?;
+        Ok(())
+    }
+
 }
 
+
+pub trait Hasher {
+    const NAME: &'static str;
+
+    /// hash the file at path `path`
+    fn hash<P: AsRef<Path>>(path: P) -> Result<String>;
+}
+
+struct Sha1Hasher;
+impl Hasher for Sha1Hasher {
+    const NAME : &'static str = "sha1";
+
+    fn hash<P: AsRef<Path>>(path: P) -> Result<String> {
+        unimplemented!()
+    }
+}
+
+
+
+/// A trait for providing the path (as in "toml-query") to the collections configuration for the
+/// entryref library.
+pub trait ConfigPathProvider {
+    const CONFIG_PATH: &'static str;
+}
+
+struct DefaultConfigPathProvider;
+impl ConfigPathProvider for DefaultConfigPathProvider {
+    const CONFIG_COLLECTIONS_PATH: &'static str = "entryref.collections";
+}

@@ -19,12 +19,20 @@
 
 use std::path::PathBuf;
 
+use libimagstore::storeid::StoreId;
+
 /// A identifier for telling libimagentryref what to search for
 ///
 /// An entry can either be identified by its hash or by its (relative) path.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum Identifier {
     Hash(String),
-    Path(PathBuf)
+    PathPart(PathBuf),
+
+    /// A StoreId, which can be passed to store functions as well, for when the user can build the
+    /// StoreId.
+    ///
+    /// Normally not needed when using libimagentryref, as a user can only pass hash or path part.
+    StoreId(StoreId),
 }
 
