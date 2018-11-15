@@ -55,6 +55,12 @@ use hasher::sha1::Sha1Hasher;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config(BTreeMap<String, PathBuf>);
 
+impl Config {
+    pub fn new(map: BTreeMap<String, PathBuf>) -> Self {
+        Config(map)
+    }
+}
+
 impl Deref for Config {
     type Target = BTreeMap<String, PathBuf>;
 
