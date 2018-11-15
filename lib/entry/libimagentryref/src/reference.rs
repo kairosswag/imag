@@ -21,6 +21,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
+use std::ops::Deref;
 
 use libimagentryutil::isa::Is;
 use libimagentryutil::isa::IsKindHeaderPathProvider;
@@ -36,10 +37,19 @@ use failure::Error;
 use failure::err_msg;
 use failure::ResultExt;
 
-pub trait Ref<H = Sha1Hasher, C = DefaultConfigPathProvider>
-    where H: Hasher,
-          C: ConfigPathProvider,
-{
+/// A configuration of "collection name" -> "collection path" mappings
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Config(BTreeMap<String, PathBuf>);
+
+impl Deref for Config {
+    type Target = BTreeMap<String, PathBuf>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+pub trait Ref<H : Hasher = Sha1Hasher> {
 
     /// Check whether the underlying object is actually a ref
     fn is_ref(&self) -> Result<bool>;
@@ -51,14 +61,14 @@ pub trait Ref<H = Sha1Hasher, C = DefaultConfigPathProvider>
     fn get_hash(&self) -> Result<&str>;
 
     /// Check whether the referenced file still matches its hash
-    fn hash_valid(&self, config: &Value) -> Result<bool>;
+    fn hash_valid(&self, config: &Config) -> Result<bool>;
 
     fn remove_ref(&mut self) -> Result<()>;
 
     /// Make a ref out of a normal (non-ref) entry.
     ///
     /// If the entry is already a ref, this fails if `force` is false
-    fn make_ref<P, Coll>(&mut self, path: P, collection_name: Coll, config: &Value, force: bool)
+    fn make_ref<P, Coll>(&mut self, path: P, collection_name: Coll, config: &Config, force: bool)
         -> Result<()>
         where P: AsRef<Path> + Debug,
               Coll: AsRef<str> + Debug;
@@ -66,10 +76,7 @@ pub trait Ref<H = Sha1Hasher, C = DefaultConfigPathProvider>
 
 provide_kindflag_path!(pub IsRef, "ref.is_ref");
 
-impl<H, C> Ref<H, C> for Entry
-    where H: Hasher,
-          C: ConfigPathProvider,
-{
+impl<H: Hasher> Ref<H> for Entry {
 
     /// Check whether the underlying object is actually a ref
     fn is_ref(&self) -> Result<bool> {
@@ -104,7 +111,7 @@ impl<H, C> Ref<H, C> for Entry
             .map(PathBuf::from)
     }
 
-    fn hash_valid(&self, config: &Value) -> Result<bool> {
+    fn hash_valid(&self, config: &Config) -> Result<bool> {
         let ref_header = self.get_header()
             .read("ref")?
             .ok_or_else(|| err_msg("Header missing at 'ref'"))?;
@@ -125,7 +132,7 @@ impl<H, C> Ref<H, C> for Entry
             .ok_or_else(|| Error::from(EM::EntryHeaderTypeError2("ref.hash.<hash>", "string")))?;
 
 
-        let file_path = get_file_path::<C, _, _>(config, collection_name, &path)?;
+        let file_path = get_file_path(config, collection_name.as_ref(), &path)?;
 
         ref_header
             .read(H::NAME)
@@ -155,7 +162,7 @@ impl<H, C> Ref<H, C> for Entry
     ///
     /// If the entry is already a ref, this fails if `force` is false
     ///
-    fn make_ref<P, Coll>(&mut self, path: P, collection_name: Coll, config: &Value, force: bool)
+    fn make_ref<P, Coll>(&mut self, path: P, collection_name: Coll, config: &Config, force: bool)
         -> Result<()>
         where P: AsRef<Path> + Debug,
               Coll: AsRef<str> + Debug
@@ -164,7 +171,7 @@ impl<H, C> Ref<H, C> for Entry
             let _ = Err(err_msg("Entry is already a reference")).context("Making ref out of entry")?;
         }
 
-        let file_path = get_file_path::<C, _, _>(config, &collection_name, &path)?;
+        let file_path = get_file_path(config, collection_name.as_ref(), &path)?;
 
         if !file_path.exists() {
             let msg = format_err!("File '{:?}' does not exist", file_path);
@@ -203,19 +210,6 @@ impl Hasher for Sha1Hasher {
     }
 }
 
-
-
-/// A trait for providing the path (as in "toml-query") to the collections configuration for the
-/// entryref library.
-pub trait ConfigPathProvider {
-    const CONFIG_COLLECTIONS_PATH: &'static str;
-}
-
-pub struct DefaultConfigPathProvider;
-impl ConfigPathProvider for DefaultConfigPathProvider {
-    const CONFIG_COLLECTIONS_PATH: &'static str = "entryref.collections";
-}
-
 /// Create a new header section for a "ref".
 ///
 /// # Warning
@@ -252,28 +246,17 @@ pub(crate) fn make_header_section<P, C, H>(hash: String, hashname: H, relpath: P
     Ok(header_section)
 }
 
-fn get_file_path<C, Coll, P>(config: &Value, collection_name: Coll, path: P) -> Result<PathBuf>
-        where P: AsRef<Path> + Debug,
-              Coll: AsRef<str> + Debug,
-              C: ConfigPathProvider
+fn get_file_path<P>(config: &Config, collection_name: &str, path: P) -> Result<PathBuf>
+        where P: AsRef<Path> + Debug
 {
-    let collection_config_path = PathBuf::from(C::CONFIG_COLLECTIONS_PATH)
-        .join(PathBuf::from(collection_name.as_ref()));
-
-    let file_path = config
-        .read(&collection_config_path.to_str().ok_or_else(|| Error::from(EM::UTF8Error))?)
-        .context("Making ref out of entry")?
+    config
+        .get(collection_name)
+        .map(PathBuf::clone)
         .ok_or_else(|| {
-            format_err!("Configuration missing at '{:?}'", collection_config_path)
+            format_err!("Configuration missing for collection: '{}'", collection_name)
         })
-        .and_then(|v| v.as_str().ok_or_else(|| {
-            format_err!("Configuration type at '{:?}' should be 'string'", collection_config_path)
-        }))
-        .map(String::from)
-        .map(PathBuf::from)
-        .context("Making ref out of entry")?
-        .join(&path);
-
-    Ok(file_path)
+        .context("Making ref out of entry")
+        .map_err(Error::from)
+        .map(|p| p.join(&path))
 }
 

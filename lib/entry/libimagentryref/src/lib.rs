@@ -39,6 +39,7 @@
 extern crate itertools;
 extern crate toml;
 extern crate toml_query;
+#[macro_use] extern crate serde_derive;
 extern crate sha1;
 
 extern crate libimagstore;
