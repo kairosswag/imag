@@ -17,36 +17,38 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 //
 
-#![recursion_limit="256"]
+use std::path::Path;
 
-#![deny(
-    dead_code,
-    non_camel_case_types,
-    non_snake_case,
-    path_statements,
-    trivial_numeric_casts,
-    unstable_features,
-    unused_allocation,
-    unused_import_braces,
-    unused_imports,
-    unused_must_use,
-    unused_mut,
-    unused_qualifications,
-    while_true,
-)]
+use failure::Fallible as Result;
 
-#[macro_use] extern crate log;
-extern crate itertools;
-extern crate toml;
-extern crate toml_query;
-#[macro_use] extern crate serde_derive;
-extern crate sha1;
+pub trait Hasher {
+    const NAME: &'static str;
 
-extern crate libimagstore;
-extern crate libimagerror;
-#[macro_use] extern crate libimagentryutil;
-#[macro_use] extern crate failure;
+    /// hash the file at path `path`
+    fn hash<P: AsRef<Path>>(path: P) -> Result<String>;
+}
 
-pub mod hasher;
-pub mod reference;
+pub mod sha1 {
+    use std::path::Path;
+
+    use failure::Fallible as Result;
+    use failure::Error;
+    use sha1::{Sha1, Digest};
+
+    use hasher::Hasher;
+
+    pub struct Sha1Hasher;
+
+    impl Hasher for Sha1Hasher {
+        const NAME : &'static str = "sha1";
+
+        fn hash<P: AsRef<Path>>(path: P) -> Result<String> {
+
+            let mut hasher = Sha1::new();
+            hasher.input(::std::fs::read_to_string(path)?);
+            String::from_utf8(hasher.result().as_slice().to_vec()).map_err(Error::from)
+        }
+    }
+
+}
 

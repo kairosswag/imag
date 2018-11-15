@@ -37,7 +37,21 @@ use failure::Error;
 use failure::err_msg;
 use failure::ResultExt;
 
+use hasher::Hasher;
+use hasher::sha1::Sha1Hasher;
+
 /// A configuration of "collection name" -> "collection path" mappings
+///
+/// Should be deserializeable from the configuration file right away, because we expect a
+/// configuration like this in the config file:
+///
+/// ```toml
+/// [ref.collections]
+/// music = "/home/alice/music"
+/// documents = "/home/alice/doc"
+/// ```
+///
+/// for example.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config(BTreeMap<String, PathBuf>);
 
@@ -187,27 +201,6 @@ impl<H: Hasher> Ref<H> for Entry {
         Ok(())
     }
 
-}
-
-
-pub trait Hasher {
-    const NAME: &'static str;
-
-    /// hash the file at path `path`
-    fn hash<P: AsRef<Path>>(path: P) -> Result<String>;
-}
-
-pub struct Sha1Hasher;
-impl Hasher for Sha1Hasher {
-    const NAME : &'static str = "sha1";
-
-    fn hash<P: AsRef<Path>>(path: P) -> Result<String> {
-        use sha1::{Sha1, Digest};
-
-        let mut hasher = Sha1::new();
-        hasher.input(::std::fs::read_to_string(path)?);
-        String::from_utf8(hasher.result().as_slice().to_vec()).map_err(Error::from)
-    }
 }
 
 /// Create a new header section for a "ref".
