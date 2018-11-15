@@ -51,8 +51,7 @@ pub trait Ref<H = Sha1Hasher, C = DefaultConfigPathProvider>
     fn get_hash(&self) -> Result<&str>;
 
     /// Check whether the referenced file still matches its hash
-    fn hash_valid<Coll>(&self, collection_name: Coll) -> Result<bool>
-        where Coll: AsRef<str>;
+    fn hash_valid(&self, config: &Value) -> Result<bool>;
 
     fn remove_ref(&mut self) -> Result<()>;
 
@@ -105,26 +104,39 @@ impl<H, C> Ref<H, C> for Entry
             .map(PathBuf::from)
     }
 
-    fn hash_valid<Coll>(&self, collection_name: Coll) -> Result<bool>
-        where Coll: AsRef<str>
-    {
-        unimplemented!()
+    fn hash_valid(&self, config: &Value) -> Result<bool> {
+        let ref_header = self.get_header()
+            .read("ref")?
+            .ok_or_else(|| err_msg("Header missing at 'ref'"))?;
 
-        // TODO: Read collection path from config
-        // let path = self.get_path()?;
-        // TODO: Build file path
-        //self.get_header()
-        //    .read(&header_path)
-        //    .map_err(Error::from)?
-        //    .ok_or_else(|| {
-        //        Error::from(EM::EntryHeaderFieldMissing(header_path.to_owned()))
-        //    })
-        //    .and_then(|v| {
-        //        v.as_str().ok_or_else(|| {
-        //            Error::from(EM::EntryHeaderTypeError2(header_path.to_owned(), "string"))
-        //        })
-        //    })
-        //    .and_then(|hash| H::hash(path)? == hash)
+        let collection_name = ref_header
+            .read("collection")
+            .map_err(Error::from)?
+            .ok_or_else(|| err_msg("Header missing at 'ref.collection'"))?
+            .as_str()
+            .ok_or_else(|| Error::from(EM::EntryHeaderTypeError2("ref.hash.<hash>", "string")))?;
+
+        let path = ref_header
+            .read("path")
+            .map_err(Error::from)?
+            .ok_or_else(|| err_msg("Header missing at 'ref.path'"))?
+            .as_str()
+            .map(PathBuf::from)
+            .ok_or_else(|| Error::from(EM::EntryHeaderTypeError2("ref.hash.<hash>", "string")))?;
+
+
+        let file_path = get_file_path::<C, _, _>(config, collection_name, &path)?;
+
+        ref_header
+            .read(H::NAME)
+            .map_err(Error::from)?
+            .ok_or_else(|| format_err!("Header missing at 'ref.{}'", H::NAME))
+            .and_then(|v| {
+                v.as_str().ok_or_else(|| {
+                    Error::from(EM::EntryHeaderTypeError2("ref.hash.<hash>", "string"))
+                })
+            })
+            .and_then(|hash| H::hash(path).map(|h| h == hash))
     }
 
     fn remove_ref(&mut self) -> Result<()> {
@@ -148,29 +160,15 @@ impl<H, C> Ref<H, C> for Entry
         where P: AsRef<Path> + Debug,
               Coll: AsRef<str> + Debug
     {
-        if self.is_ref()? {
-            let _ = err_msg("Entry is already a reference").context("Making ref out of entry")?;
+        if self.is::<IsRef>()? {
+            let _ = Err(err_msg("Entry is already a reference")).context("Making ref out of entry")?;
         }
 
-        let collection_config_path = PathBuf::from(C::CONFIG_COLLECTIONS_PATH)
-            .join(PathBuf::from(collection_name.as_ref()));
-        let mut file_path = config
-            .read(&collection_config_path.to_str().ok_or_else(|| Error::from(EM::UTF8Error))?)
-            .context("Making ref out of entry")?
-            .ok_or_else(|| {
-                format_err!("Configuration missing at '{:?}'", collection_config_path)
-            })
-            .and_then(|v| v.as_str().ok_or_else(|| {
-                format_err!("Configuration type at '{:?}' should be 'string'", collection_config_path)
-            }))
-            .map(String::from)
-            .map(PathBuf::from)
-            .context("Making ref out of entry")?
-            .join(path);
+        let file_path = get_file_path::<C, _, _>(config, &collection_name, &path)?;
 
         if !file_path.exists() {
             let msg = format_err!("File '{:?}' does not exist", file_path);
-            let _   = msg.context("Making ref out of entry")?;
+            let _   = Err(msg).context("Making ref out of entry")?;
         }
 
         let _ = H::hash(&file_path)
@@ -192,7 +190,7 @@ pub trait Hasher {
     fn hash<P: AsRef<Path>>(path: P) -> Result<String>;
 }
 
-struct Sha1Hasher;
+pub struct Sha1Hasher;
 impl Hasher for Sha1Hasher {
     const NAME : &'static str = "sha1";
 
@@ -209,7 +207,7 @@ pub trait ConfigPathProvider {
     const CONFIG_COLLECTIONS_PATH: &'static str;
 }
 
-struct DefaultConfigPathProvider;
+pub struct DefaultConfigPathProvider;
 impl ConfigPathProvider for DefaultConfigPathProvider {
     const CONFIG_COLLECTIONS_PATH: &'static str = "entryref.collections";
 }
@@ -248,5 +246,30 @@ pub(crate) fn make_header_section<P, C, H>(hash: String, hashname: H, relpath: P
     let _ = header_section.insert("collection", Value::String(String::from(collection.as_ref())));
 
     Ok(header_section)
+}
+
+fn get_file_path<C, Coll, P>(config: &Value, collection_name: Coll, path: P) -> Result<PathBuf>
+        where P: AsRef<Path> + Debug,
+              Coll: AsRef<str> + Debug,
+              C: ConfigPathProvider
+{
+    let collection_config_path = PathBuf::from(C::CONFIG_COLLECTIONS_PATH)
+        .join(PathBuf::from(collection_name.as_ref()));
+
+    let file_path = config
+        .read(&collection_config_path.to_str().ok_or_else(|| Error::from(EM::UTF8Error))?)
+        .context("Making ref out of entry")?
+        .ok_or_else(|| {
+            format_err!("Configuration missing at '{:?}'", collection_config_path)
+        })
+        .and_then(|v| v.as_str().ok_or_else(|| {
+            format_err!("Configuration type at '{:?}' should be 'string'", collection_config_path)
+        }))
+        .map(String::from)
+        .map(PathBuf::from)
+        .context("Making ref out of entry")?
+        .join(&path);
+
+    Ok(file_path)
 }
 
