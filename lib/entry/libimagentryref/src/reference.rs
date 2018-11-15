@@ -142,12 +142,29 @@ pub<H, P> impl Ref<H, P> for Entry {
         }
 
         let collection_config_path = format!("{}/{}", P::CONFIG_COLLECTIONS_PATH, collection_name);
-        let file_path_directory = config.read(collection_config_path)?; // TODO
+        let mut file_path          = configuration
+            .read(collection_config_path)?
+            .ok_or_else(|| {
+                let msg = format_err!("Configuration missing at '{}'", collection_config_path);
+                Error::from(msg)
+            })?
+            .as_str()
+            .map(String::from)
+            .map(PathBuf::from)
+            .ok_or_else(|| {
+                let msg = format_err!("Configuration type at '{}' should be 'string'", collection_config_path);
+                Error::from(msg)
+            })?
+            .join(path);
 
-        let filepath = format!("{}/{}", file_path_directory, path);
-        let hash = H::hash(filepath);
+        if !filepath.exists() {
+            let msg = format_err!("File '{}' does not exist", file_path);
+            return Err(Error::from(msg))
+        }
 
-        // TODO
+        let hash   = H::hash(&filepath)?;
+        let header = make_header_section(hash, H::NAME, path, collcetion_name)?;
+        let _      = self.get_header_mut().insert("ref", header)?;
 
         entry.set_isflag::<IsRef>()?;
         Ok(())
@@ -184,3 +201,39 @@ struct DefaultConfigPathProvider;
 impl ConfigPathProvider for DefaultConfigPathProvider {
     const CONFIG_COLLECTIONS_PATH: &'static str = "entryref.collections";
 }
+
+/// Create a new header section for a "ref".
+///
+/// # Warning
+///
+/// The `relpath` _must_ be relative to the configured path for that collection.
+pub(crate) make_header_section<P, C, H>(hash: String, hashname: H, relpath: P, collection: C)
+    -> Result<Value>
+    where P: AsRef<Path>,
+          C: AsRef<str>,
+          H: AsRef<str>,
+{
+    let mut header_section = Value::Table(BTreeMap::new());
+    {
+        let relpath = relpath
+            .to_str()
+            .map(String::from)
+            .ok_or_else(|| {
+                let msg = format_err!("UTF Error in '{:?}'", relpath);
+                Error::from(msg)
+            })?;
+
+        let _ = header_section.insert("relpath", Value::String(relpath))?;
+    }
+
+    {
+        let mut hash_table = Value::Table(BTreeMap::new());
+        hash_table.insert(hashname.as_ref(), hash)
+        let _ = header_section.insert("hash", Value::Table(hash_table))?;
+    }
+
+    let _ = header_section.insert("collection", Value::String(String::from(collection.as_ref())));
+
+    Ok(header_section)
+}
+

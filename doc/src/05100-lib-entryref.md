@@ -42,7 +42,7 @@ libimagentryref does store the following data:
 ```toml
 [ref]
 filehash.sha1 = "<sha1 hash of the file>"
-relpath = "/Psy_trance_2018_yearmix.mp3"
+relpath = "Psy_trance_2018_yearmix.mp3"
 collection = "music"
 ```
 
