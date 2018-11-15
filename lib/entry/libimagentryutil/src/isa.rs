@@ -71,6 +71,7 @@ use toml_query::insert::TomlValueInsertExt;
 pub trait Is {
     fn is<T: IsKindHeaderPathProvider>(&self) -> Result<bool>;
     fn set_isflag<T: IsKindHeaderPathProvider>(&mut self) -> Result<()>;
+    fn remove_isflag<T: IsKindHeaderPathProvider>(&mut self) -> Result<()>;
 }
 
 impl Is for ::libimagstore::store::Entry {
@@ -86,6 +87,13 @@ impl Is for ::libimagstore::store::Entry {
     fn set_isflag<T: IsKindHeaderPathProvider>(&mut self) -> Result<()> {
         self.get_header_mut()
             .insert(T::kindflag_header_location(), Value::Boolean(true))
+            .map_err(Error::from)
+            .map(|_| ())
+    }
+
+    fn remove_isflag<T: IsKindHeaderPathProvider>(&mut self) -> Result<()> {
+        self.get_header_mut()
+            .delete(T::kindflag_header_location())
             .map_err(Error::from)
             .map(|_| ())
     }
