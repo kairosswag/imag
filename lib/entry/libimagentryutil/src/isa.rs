@@ -23,6 +23,7 @@ use failure::Error;
 use toml::Value;
 use toml_query::read::TomlValueReadTypeExt;
 use toml_query::insert::TomlValueInsertExt;
+use toml_query::delete::TomlValueDeleteExt;
 
 /// Trait to check whether an entry is a certain kind of entry
 ///
