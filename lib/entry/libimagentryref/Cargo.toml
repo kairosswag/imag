@@ -33,3 +33,6 @@ libimagstore     = { version = "0.10.0", path = "../../../lib/core/libimagstore"
 libimagerror     = { version = "0.10.0", path = "../../../lib/core/libimagerror" }
 libimagentryutil = { version = "0.10.0", path = "../../../lib/entry/libimagentryutil" }
 
+[dev-dependencies]
+env_logger = "0.5"
+

@@ -253,3 +253,99 @@ fn get_file_path<P>(config: &Config, collection_name: &str, path: P) -> Result<P
         .map(|p| p.join(&path))
 }
 
+
+#[cfg(test)]
+mod test {
+    use std::path::PathBuf;
+    use std::sync::Arc;
+
+    use libimagstore::store::Store;
+
+    use super::*;
+    use hasher::Hasher;
+
+    fn setup_logging() {
+        let _ = ::env_logger::try_init();
+    }
+
+    pub fn get_store() -> Store {
+        use libimagstore::file_abstraction::InMemoryFileAbstraction;
+        let backend = Arc::new(InMemoryFileAbstraction::default());
+        Store::new_with_backend(PathBuf::from("/"), &None, backend).unwrap()
+    }
+
+    struct TestHasher;
+    impl Hasher for TestHasher {
+        const NAME: &'static str = "Testhasher";
+
+        fn hash<P: AsRef<Path>>(path: P) -> Result<String> {
+            path.to_str()
+                .map(String::from)
+                .ok_or_else(|| Error::from(err_msg("Failed to create test hash")))
+        }
+    }
+
+
+    #[test]
+    fn test_isref() {
+        setup_logging();
+        let store = get_store();
+        let entry = store.retrieve("test_isref").unwrap();
+
+        assert!(!entry.is_ref().unwrap());
+    }
+
+    #[test]
+    fn test_makeref() {
+        setup_logging();
+        let store           = get_store();
+        let entry           = store.retrieve("test_makeref").unwrap();
+        let file            = PathBuf::from("/tmp/foo");
+        let collection_name = "some_collection";
+        let config          = Config({
+            let mut c = BTreeMap::new();
+            c.insert(String::from("some_collection"), PathBuf::from("/tmp"));
+            c
+        });
+
+        assert!((entry as &Ref<TestHasher>).make_ref(file, collection_name, &config, false).is_ok());
+    }
+
+    #[test]
+    fn test_makeref_isref() {
+        setup_logging();
+        let store           = get_store();
+        let entry           = store.retrieve("test_makeref_isref").unwrap();
+        let file            = PathBuf::from("/tmp/foo");
+        let collection_name = "some_collection";
+        let config          = Config({
+            let mut c = BTreeMap::new();
+            c.insert(String::from("some_collection"), PathBuf::from("/tmp"));
+            c
+        });
+
+        assert!((entry as &Ref<TestHasher>).make_ref(file, collection_name, &config, false).is_ok());
+        assert!((entry as &Ref<TestHasher>).is_ref().unwrap());
+    }
+
+    #[test]
+    fn test_makeref_remref() {
+        setup_logging();
+        let store           = get_store();
+        let entry           = store.retrieve("test_makeref_remref").unwrap();
+        let file            = PathBuf::from("/tmp/foo");
+        let collection_name = "some_collection";
+        let config          = Config({
+            let mut c = BTreeMap::new();
+            c.insert(String::from("some_collection"), PathBuf::from("/tmp"));
+            c
+        });
+
+        assert!((entry as &Ref<TestHasher>).make_ref(file, collection_name, &config, false).is_ok());
+        assert!((entry as &Ref<TestHasher>).is_ref().unwrap());
+        assert!((entry as &Ref<TestHasher>).remove_ref().is_ok());
+        assert!(!(entry as &Ref<TestHasher>).is_ref().unwrap());
+    }
+
+}
+

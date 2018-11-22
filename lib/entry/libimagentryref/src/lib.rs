@@ -47,6 +47,9 @@ extern crate libimagerror;
 #[macro_use] extern crate libimagentryutil;
 #[macro_use] extern crate failure;
 
+#[cfg(test)]
+extern crate env_logger;
+
 pub mod hasher;
 pub mod reference;
 
