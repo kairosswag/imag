@@ -45,6 +45,7 @@ extern crate toml_query;
 extern crate libimagstore;
 extern crate libimagerror;
 
+pub mod header;
 pub mod isa;
 pub mod isincollection;
 pub mod iter;
