@@ -329,6 +329,39 @@ mod test {
     }
 
     #[test]
+    fn test_makeref_is_ref_with_testhash() {
+        setup_logging();
+        let store           = get_store();
+        let entry           = store.retrieve("test_makeref_is_ref_with_testhash").unwrap();
+        let file            = PathBuf::from("/tmp/foo");
+        let collection_name = "some_collection";
+        let config          = Config({
+            let mut c = BTreeMap::new();
+            c.insert(String::from("some_collection"), PathBuf::from("/tmp"));
+            c
+        });
+
+        assert!((entry as &Ref<TestHasher>).make_ref(file, collection_name, &config, false).is_ok());
+
+        let check_isstr = |entry, location, shouldbe| {
+            let var = entry.get_header().read(location);
+
+            assert!(var.is_ok(), "{} is not Ok(_): {:?}", location, var);
+            let var = var.unwrap();
+
+            assert!(var.is_some(), "{} is not Some(_): {:?}", location, var);
+            let var = var.unwrap().as_str();
+
+            assert!(var.is_some(), "{} is not String: {:?}", location, var);
+            assert_eq!(var.unwrap(), shoudlbe, "{} is not == {}", location, shouldbe);
+        };
+
+        check_isstr(entry, "ref.relpath", "foo");
+        check_isstr(entry, "ref.hash", "/tmp/foo"); // TestHasher hashes by returning the path itself
+        check_isstr(entry, "ref.collection", "/tmp");
+    }
+
+    #[test]
     fn test_makeref_remref() {
         setup_logging();
         let store           = get_store();
