@@ -20,7 +20,7 @@
 //! Utilities to access entry headers without boilerplate
 //!
 //! With this utility, a library can define a part of an imag entry header with a normal struct
-//! which has to implemenet `Serialize` and `Deserialize` (which is trivial and can be derived
+//! which has to implement `Serialize` and `Deserialize` (which is trivial and can be derived
 //! in most cases), and the user of the library can then use the provided interface to fetch a rust
 //! object from a header.
 //!
@@ -48,17 +48,16 @@
 //! and provide an accessor type:
 //!
 //! ```
-//! struct FooHeaderHAS;
-//! impl HeaderAccessorSpec for FooHeaderHAS {
+//! impl HeaderPartial for FooHeader {
 //!     const HEADER_LOCATION: &'static str = "foo";
-//!     type Output = FooHeader;
+//!     type Output = Self;
 //! }
 //! ```
 //!
 //! and then use the `HeaderAccessor` extension to access this data:
 //!
 //! ```norun
-//! let foohdr = entry.header_read::<FooHeaderHAS>().unwrap().unwrap(); // should handle errors
+//! let foohdr = entry.get_header().read_partial::<FooHeaderHAS>().unwrap().unwrap(); // should handle errors
 //! // foohdr.bar
 //! // foohdr.content
 //! ```
@@ -66,25 +65,14 @@
 //!
 //! # Discussion
 //!
-//! It might be a good idea to implement `HeaderAccessorSpec` directly on the header type itself:
+//! The `toml_query` crate provides the functionality for reading and writing header partials. The
+//! traits in this module only add a thin layer over the functionality from `toml_query` so that the
+//! usage is more convenient.
 //!
-//! ```norun
-//! impl HeaderAccessorSpec for FooHeader {
-//!     const HEADER_LOCATION: &'static str = "foo";
-//!     type Output = FooHeader;
-//! }
-//! ```
+//! The value this module adds to the ecosystem is that the _path_ of the header partial can be
+//! encoded (via the `HeaderPartial` trait` into the partial type itself.
 //!
-//! Which would result in the following calling code:
-//!
-//! ```norun
-//! let foohdr = entry.header_read::<FooHeader>().unwrap().unwrap(); // should handle errors
-//! ```
-//!
-//! which automatically describes the resulting type in the calling code. Because of the zero-sized
-//! nature of the API, this should be possible.
-//!
-//! It is not yet tested yet, though.
+//! One might move this functionality into `toml_query` at some point in time.
 //!
 //!
 //! # Additional details
@@ -92,12 +80,12 @@
 //! By using this library, type-check boilerplate code in the header-processing of the libraries
 //! can be removed.
 //!
-//! Using zero-sized types for the `HeaderAccessorSpec` should result in very little runtime
+//! Using zero-sized types for the `HeaderPartial` should result in very little runtime
 //! overhead.
 //!
 //! Of course it is also possible to only partially serialize headers (for example "sub-headers" or
-//! only single fields, by specifying `HeaderAccessorSpec::Output = String` and
-//! `HeaderAccessorSpec::HEADER_LOCATION = "foo.content"`.
+//! only single fields, by specifying `HeaderPartial::Output = String` and
+//! `HeaderPartial::HEADER_LOCATION = "foo.content"`.
 //!
 
 use std::fmt::Debug;
@@ -105,13 +93,12 @@ use std::fmt::Debug;
 use failure::Error;
 use failure::Fallible as Result;
 use serde::{Serialize, Deserialize};
+use toml::Value;
 use toml_query::read::TomlValueReadExt;
 
-use libimagstore::store::Entry;
-
-/// Describes a _part_ of a headerdeser
+/// Describes a _part_ of a header
 ///
-pub trait HeaderAccessorSpec<'a> {
+pub trait HeaderPartial<'a> {
     // The location ("section") of the header where to find the struct
     const HEADER_LOCATION: &'static str;
 
@@ -119,20 +106,17 @@ pub trait HeaderAccessorSpec<'a> {
     type Output: Serialize + Deserialize<'a> + Debug;
 }
 
-pub trait HeaderAccessor {
+pub trait HeaderPartialAccessor {
 
-    fn header_read<'a, HAS: HeaderAccessorSpec<'a>>(&self) -> Result<Option<HAS::Output>>;
+    fn read_partial<'a, HAS: HeaderPartial<'a>>(&self) -> Result<Option<HAS::Output>>;
 
 }
 
-impl HeaderAccessor for Entry {
+impl HeaderPartialAccessor for Value {
 
-    fn header_read<'a, HAS: HeaderAccessorSpec<'a>>(&self) -> Result<Option<HAS::Output>> {
+    fn read_partial<'a, HAS: HeaderPartial<'a>>(&self) -> Result<Option<HAS::Output>> {
         trace!("Reading header of {:?} at '{}'", self, HAS::HEADER_LOCATION);
-
-        self.get_header()
-            .read_deserialized::<HAS::Output>(HAS::HEADER_LOCATION)
-            .map_err(Error::from)
+        self.read_deserialized::<HAS::Output>(HAS::HEADER_LOCATION).map_err(Error::from)
     }
 
 }
@@ -151,11 +135,11 @@ mod tests {
     use libimagstore::store::Store;
 
     #[derive(Debug, Deserialize, Serialize)]
-    struct HeaderPartial {
+    struct TestHeader {
         pub value: String,
     }
 
-    impl<'a> HeaderAccessorSpec<'a> for HeaderPartial {
+    impl<'a> HeaderPartial<'a> for TestHeader {
         const HEADER_LOCATION: &'static str = "foo";
         type Output                         = Self;
     }
@@ -180,10 +164,10 @@ mod tests {
             let mut tbl = BTreeMap::new();
             tbl.insert(String::from("value"), Value::String(String::from("foobar")));
             let tbl = Value::Table(tbl);
-            entry.get_header_mut().insert(HeaderPartial::HEADER_LOCATION, tbl).unwrap();
+            entry.get_header_mut().insert(TestHeader::HEADER_LOCATION, tbl).unwrap();
         }
 
-        let header : HeaderPartial = entry.header_read::<HeaderPartial>().unwrap().unwrap();
+        let header : TestHeader = entry.get_header().read_partial::<TestHeader>().unwrap().unwrap();
         assert_eq!(header.value, "foobar");
     }
 }
