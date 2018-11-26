@@ -40,7 +40,15 @@
 extern crate filters;
 extern crate toml;
 extern crate toml_query;
+extern crate serde;
 #[macro_use] extern crate failure;
+#[macro_use] extern crate log;
+
+#[cfg(test)]
+extern crate env_logger;
+
+#[cfg(test)]
+#[macro_use] extern crate serde_derive;
 
 extern crate libimagstore;
 extern crate libimagerror;

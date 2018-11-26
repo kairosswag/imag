@@ -100,27 +100,34 @@
 //! `HeaderAccessorSpec::HEADER_LOCATION = "foo.content"`.
 //!
 
-use std::ops::Debug;
+use std::fmt::Debug;
+
+use failure::Error;
+use failure::Fallible as Result;
+use serde::{Serialize, Deserialize};
+use toml_query::read::TomlValueReadExt;
+
+use libimagstore::store::Entry;
 
 /// Describes a _part_ of a headerdeser
 ///
-pub trait HeaderAccessorSpec {
+pub trait HeaderAccessorSpec<'a> {
     // The location ("section") of the header where to find the struct
     const HEADER_LOCATION: &'static str;
 
     // The type which represents the data
-    type Output: Serialize + Deserialize + Debug;
+    type Output: Serialize + Deserialize<'a> + Debug;
 }
 
 pub trait HeaderAccessor {
 
-    fn read<HAS: HeaderAccessorSpec>(&self) -> Result<Option<HAS::Output>>;
+    fn header_read<'a, HAS: HeaderAccessorSpec<'a>>(&self) -> Result<Option<HAS::Output>>;
 
 }
 
 impl HeaderAccessor for Entry {
 
-    fn header_read<HAS: HeaderAccessorSpec>(&self) -> Result<Option<HAS::Output>> {
+    fn header_read<'a, HAS: HeaderAccessorSpec<'a>>(&self) -> Result<Option<HAS::Output>> {
         trace!("Reading header of {:?} at '{}'", self, HAS::HEADER_LOCATION);
 
         self.get_header()
@@ -128,5 +135,56 @@ impl HeaderAccessor for Entry {
             .map_err(Error::from)
     }
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::path::PathBuf;
+    use std::sync::Arc;
+    use std::collections::BTreeMap;
+
+    use toml::Value;
+    use toml_query::insert::TomlValueInsertExt;
+
+    use libimagstore::store::Store;
+
+    #[derive(Debug, Deserialize, Serialize)]
+    struct HeaderPartial {
+        pub value: String,
+    }
+
+    impl<'a> HeaderAccessorSpec<'a> for HeaderPartial {
+        const HEADER_LOCATION: &'static str = "foo";
+        type Output                         = Self;
+    }
+
+    fn setup_logging() {
+        let _ = ::env_logger::try_init();
+    }
+
+    pub fn get_store() -> Store {
+        use libimagstore::file_abstraction::InMemoryFileAbstraction;
+        let backend = Arc::new(InMemoryFileAbstraction::default());
+        Store::new_with_backend(PathBuf::from("/"), &None, backend).unwrap()
+    }
+
+    #[test]
+    fn test_compiles() {
+        setup_logging();
+        let store     = get_store();
+        let id        = PathBuf::from("test_compiles");
+        let mut entry = store.retrieve(id).unwrap();
+        {
+            let mut tbl = BTreeMap::new();
+            tbl.insert(String::from("value"), Value::String(String::from("foobar")));
+            let tbl = Value::Table(tbl);
+            entry.get_header_mut().insert(HeaderPartial::HEADER_LOCATION, tbl).unwrap();
+        }
+
+        let header : HeaderPartial = entry.header_read::<HeaderPartial>().unwrap().unwrap();
+        assert_eq!(header.value, "foobar");
+    }
 }
 
