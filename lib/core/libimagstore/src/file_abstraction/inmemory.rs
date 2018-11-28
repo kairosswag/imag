@@ -33,7 +33,7 @@ use super::FileAbstraction;
 use super::FileAbstractionInstance;
 use super::Drain;
 use store::Entry;
-use storeid::StoreId;
+use storeid::StoreIdWithBase;
 use file_abstraction::iter::PathIterator;
 use file_abstraction::iter::PathIterBuilder;
 
@@ -64,7 +64,7 @@ impl FileAbstractionInstance for InMemoryFileAbstractionInstance {
     /**
      * Get the mutable file behind a InMemoryFileAbstraction object
      */
-    fn get_file_content(&mut self, _: StoreId) -> Result<Option<Entry>> {
+    fn get_file_content(&mut self, _: StoreIdWithBase<'_>) -> Result<Option<Entry>> {
         debug!("Getting lazy file: {:?}", self);
 
         self.fs_abstraction
@@ -187,7 +187,7 @@ impl FileAbstraction for InMemoryFileAbstraction {
         Ok(())
     }
 
-    fn pathes_recursively(&self, _basepath: PathBuf, storepath: PathBuf, backend: Arc<FileAbstraction>) -> Result<PathIterator> {
+    fn pathes_recursively<'a>(&self, _basepath: PathBuf, storepath: &'a PathBuf, backend: Arc<FileAbstraction>) -> Result<PathIterator<'a>> {
         trace!("Building PathIterator object (inmemory implementation)");
         let keys : Vec<PathBuf> = self
             .backend()

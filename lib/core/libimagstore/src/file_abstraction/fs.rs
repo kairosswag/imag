@@ -28,7 +28,7 @@ use super::FileAbstraction;
 use super::FileAbstractionInstance;
 use super::Drain;
 use store::Entry;
-use storeid::StoreId;
+use storeid::StoreIdWithBase;
 use file_abstraction::iter::PathIterator;
 use file_abstraction::iter::PathIterBuilder;
 
@@ -45,7 +45,7 @@ impl FileAbstractionInstance for FSFileAbstractionInstance {
     /**
      * Get the content behind this file
      */
-    fn get_file_content(&mut self, id: StoreId) -> Result<Option<Entry>> {
+    fn get_file_content<'a>(&mut self, id: StoreIdWithBase<'a>) -> Result<Option<Entry>> {
         debug!("Getting lazy file: {:?}", self);
 
         let mut file = match open_file(&self.0) {
@@ -153,11 +153,11 @@ impl FileAbstraction for FSFileAbstraction {
         })
     }
 
-    fn pathes_recursively(&self,
+    fn pathes_recursively<'a>(&self,
                           basepath: PathBuf,
-                          storepath: PathBuf,
+                          storepath: &'a PathBuf,
                           backend: Arc<FileAbstraction>)
-        -> Result<PathIterator>
+        -> Result<PathIterator<'a>>
     {
         trace!("Building PathIterator object");
         Ok(PathIterator::new(Box::new(WalkDirPathIterBuilder { basepath }), storepath, backend))

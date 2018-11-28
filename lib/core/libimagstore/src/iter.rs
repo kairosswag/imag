@@ -138,7 +138,6 @@ mod compile_test {
 }
 
 use storeid::StoreId;
-use storeid::StoreIdIterator;
 use self::delete::StoreDeleteIterator;
 use self::get::StoreGetIterator;
 use self::retrieve::StoreRetrieveIterator;
@@ -167,11 +166,11 @@ use failure::Fallible as Result;
 ///
 /// Functionality to exclude subdirectories is not possible with the current implementation and has
 /// to be done during iteration, with filtering (as usual).
-pub struct Entries<'a>(PathIterator, &'a Store);
+pub struct Entries<'a>(PathIterator<'a>, &'a Store);
 
 impl<'a> Entries<'a> {
 
-    pub(crate) fn new(pi: PathIterator, store: &'a Store) -> Self {
+    pub(crate) fn new(pi: PathIterator<'a>, store: &'a Store) -> Self {
         Entries(pi, store)
     }
 
@@ -179,29 +178,30 @@ impl<'a> Entries<'a> {
         Entries(self.0.in_collection(c), self.1)
     }
 
-    pub fn without_store(self) -> StoreIdIterator {
-        StoreIdIterator::new(Box::new(self.0))
-    }
+    // TODO: Remove or fix me
+    //pub fn without_store(self) -> StoreIdIterator {
+    //    StoreIdIterator::new(Box::new(self.0.map(|r| r.map(|id| id.without_base()))))
+    //}
 
     /// Transform the iterator into a StoreDeleteIterator
     ///
     /// This immitates the API from `libimagstore::iter`.
     pub fn into_delete_iter(self) -> StoreDeleteIterator<'a> {
-        StoreDeleteIterator::new(Box::new(self.0), self.1)
+        StoreDeleteIterator::new(Box::new(self.0.map(|r| r.map(|id| id.without_base()))), self.1)
     }
 
     /// Transform the iterator into a StoreGetIterator
     ///
     /// This immitates the API from `libimagstore::iter`.
     pub fn into_get_iter(self) -> StoreGetIterator<'a> {
-        StoreGetIterator::new(Box::new(self.0), self.1)
+        StoreGetIterator::new(Box::new(self.0.map(|r| r.map(|id| id.without_base()))), self.1)
     }
 
     /// Transform the iterator into a StoreRetrieveIterator
     ///
     /// This immitates the API from `libimagstore::iter`.
     pub fn into_retrieve_iter(self) -> StoreRetrieveIterator<'a> {
-        StoreRetrieveIterator::new(Box::new(self.0), self.1)
+        StoreRetrieveIterator::new(Box::new(self.0.map(|r| r.map(|id| id.without_base()))), self.1)
     }
 
 }
@@ -210,7 +210,7 @@ impl<'a> Iterator for Entries<'a> {
     type Item = Result<StoreId>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.next()
+        self.0.next().map(|r| r.map(|id| id.without_base()))
     }
 }
 

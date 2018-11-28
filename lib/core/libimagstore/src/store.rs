@@ -64,14 +64,15 @@ enum StoreEntryStatus {
 #[derive(Debug)]
 struct StoreEntry {
     id: StoreId,
+    store_base: PathBuf, // small sacrefice over lifetimes on the Store type
     file: Box<FileAbstractionInstance>,
     status: StoreEntryStatus,
 }
 
 impl StoreEntry {
 
-    fn new(id: StoreId, backend: &Arc<FileAbstraction>) -> Result<StoreEntry> {
-        let pb = id.clone().into_pathbuf()?;
+    fn new(store_base: PathBuf, id: StoreId, backend: &Arc<FileAbstraction>) -> Result<StoreEntry> {
+        let pb = id.clone().with_base(&store_base).into_pathbuf()?;
 
         #[cfg(feature = "fs-lock")]
         {
@@ -82,6 +83,7 @@ impl StoreEntry {
 
         Ok(StoreEntry {
             id,
+            store_base,
             file: backend.new_instance(pb),
             status: StoreEntryStatus::Present,
         })
@@ -95,7 +97,7 @@ impl StoreEntry {
 
     fn get_entry(&mut self) -> Result<Entry> {
         if !self.is_borrowed() {
-            match self.file.get_file_content(self.id.clone())? {
+            match self.file.get_file_content(self.id.clone().with_base(&self.store_base))? {
                 Some(file) => Ok(file),
                 None       => Ok(Entry::new(self.id.clone()))
             }
@@ -218,7 +220,7 @@ impl Store {
     /// On success: FileLockEntry
     ///
     pub fn create<'a, S: IntoStoreId>(&'a self, id: S) -> Result<FileLockEntry<'a>> {
-        let id = id.into_storeid()?.with_base(self.path().clone());
+        let id = id.into_storeid()?;
 
         debug!("Creating id: '{}'", id);
 
@@ -244,7 +246,7 @@ impl Store {
             }
             hsmap.insert(id.clone(), {
                 debug!("Creating: '{}'", id);
-                let mut se = StoreEntry::new(id.clone(), &self.backend)?;
+                let mut se = StoreEntry::new(self.path().clone(), id.clone(), &self.backend)?;
                 se.status = StoreEntryStatus::Borrowed;
                 se
             });
@@ -266,14 +268,14 @@ impl Store {
     /// On success: FileLockEntry
     ///
     pub fn retrieve<'a, S: IntoStoreId>(&'a self, id: S) -> Result<FileLockEntry<'a>> {
-        let id = id.into_storeid()?.with_base(self.path().clone());
+        let id = id.into_storeid()?;
         debug!("Retrieving id: '{}'", id);
         let entry = self
             .entries
             .write()
             .map_err(|_| Error::from(EM::LockError))
             .and_then(|mut es| {
-                let new_se = StoreEntry::new(id.clone(), &self.backend)?;
+                let new_se = StoreEntry::new(self.path().clone(), id.clone(), &self.backend)?;
                 let se = es.entry(id.clone()).or_insert(new_se);
                 let entry = se.get_entry();
                 se.status = StoreEntryStatus::Borrowed;
@@ -296,7 +298,7 @@ impl Store {
     ///  - Errors Store::retrieve() might return
     ///
     pub fn get<'a, S: IntoStoreId + Clone>(&'a self, id: S) -> Result<Option<FileLockEntry<'a>>> {
-        let id = id.into_storeid()?.with_base(self.path().clone());
+        let id = id.into_storeid()?;
 
         debug!("Getting id: '{}'", id);
 
@@ -409,7 +411,7 @@ impl Store {
     /// On success: Entry
     ///
     pub fn get_copy<S: IntoStoreId>(&self, id: S) -> Result<Entry> {
-        let id = id.into_storeid()?.with_base(self.path().clone());
+        let id = id.into_storeid()?;
         debug!("Retrieving copy of '{}'", id);
         let entries = self.entries.write()
             .map_err(|_| Error::from(EM::LockError))
@@ -422,7 +424,7 @@ impl Store {
                 .map_err(Error::from)
         }
 
-        StoreEntry::new(id, &self.backend)?.get_entry()
+        StoreEntry::new(self.path().clone(), id, &self.backend)?.get_entry()
     }
 
     /// Delete an entry and the corrosponding file on disk
@@ -432,7 +434,7 @@ impl Store {
     /// On success: ()
     ///
     pub fn delete<S: IntoStoreId>(&self, id: S) -> Result<()> {
-        let id = id.into_storeid()?.with_base(self.path().clone());
+        let id = id.into_storeid()?;
 
         debug!("Deleting id: '{}'", id);
 
@@ -440,7 +442,7 @@ impl Store {
         // StoreId::exists(), a PathBuf object gets allocated. So we simply get a
         // PathBuf here, check whether it is there and if it is, we can re-use it to
         // delete the filesystem file.
-        let pb = id.clone().into_pathbuf()?;
+        let pb = id.clone().with_base(self.path()).into_pathbuf()?;
 
         {
             let mut entries = self
@@ -507,7 +509,6 @@ impl Store {
     fn save_to_other_location(&self, entry: &FileLockEntry, new_id: StoreId, remove_old: bool)
         -> Result<()>
     {
-        let new_id = new_id.with_base(self.path().clone());
         let hsmap = self
             .entries
             .write()
@@ -522,8 +523,8 @@ impl Store {
 
         let old_id = entry.get_location().clone();
 
-        let old_id_as_path = old_id.clone().with_base(self.path().clone()).into_pathbuf()?;
-        let new_id_as_path = new_id.clone().with_base(self.path().clone()).into_pathbuf()?;
+        let old_id_as_path = old_id.clone().with_base(self.path()).into_pathbuf()?;
+        let new_id_as_path = new_id.clone().with_base(self.path()).into_pathbuf()?;
         self.backend
             .copy(&old_id_as_path, &new_id_as_path)
             .and_then(|_| if remove_old {
@@ -571,9 +572,6 @@ impl Store {
     /// So the link is _partly dangling_, so to say.
     ///
     pub fn move_by_id(&self, old_id: StoreId, new_id: StoreId) -> Result<()> {
-        let new_id = new_id.with_base(self.path().clone());
-        let old_id = old_id.with_base(self.path().clone());
-
         debug!("Moving '{}' to '{}'", old_id, new_id);
 
         {
@@ -594,8 +592,8 @@ impl Store {
 
             debug!("Old id is not yet borrowed");
 
-            let old_id_pb = old_id.clone().with_base(self.path().clone()).into_pathbuf()?;
-            let new_id_pb = new_id.clone().with_base(self.path().clone()).into_pathbuf()?;
+            let old_id_pb = old_id.clone().with_base(self.path()).into_pathbuf()?;
+            let new_id_pb = new_id.clone().with_base(self.path()).into_pathbuf()?;
 
             if self.backend.exists(&new_id_pb)? {
                 return Err(format_err!("Entry already exists: {}", new_id));
@@ -618,8 +616,8 @@ impl Store {
             assert!(hsmap
                     .remove(&old_id)
                     .and_then(|mut entry| {
-                        entry.id = new_id.clone();
-                        hsmap.insert(new_id.clone(), entry)
+                        entry.id = new_id.clone().into();
+                        hsmap.insert(new_id.clone().into(), entry)
                     }).is_none())
         }
 
@@ -631,7 +629,7 @@ impl Store {
     pub fn entries<'a>(&'a self) -> Result<Entries<'a>> {
         trace!("Building 'Entries' iterator");
         self.backend
-            .pathes_recursively(self.path().clone(), self.path().clone(), self.backend.clone())
+            .pathes_recursively(self.path().clone(), self.path(), self.backend.clone())
             .map(|i| Entries::new(i, self))
     }
 
@@ -1000,7 +998,7 @@ Hai
         setup_logging();
 
         debug!("{}", TEST_ENTRY);
-        let entry = Entry::from_str(StoreId::new_baseless(PathBuf::from("test/foo~1.3")).unwrap(),
+        let entry = Entry::from_str(StoreId::new(PathBuf::from("test/foo~1.3")).unwrap(),
                                     TEST_ENTRY).unwrap();
 
         assert_eq!(entry.content, "Hai");
@@ -1014,7 +1012,7 @@ Hai
         setup_logging();
 
         debug!("{}", TEST_ENTRY);
-        let entry = Entry::from_str(StoreId::new_baseless(PathBuf::from("test/foo~1.3")).unwrap(),
+        let entry = Entry::from_str(StoreId::new(PathBuf::from("test/foo~1.3")).unwrap(),
                                     TEST_ENTRY).unwrap();
         let string = entry.to_str().unwrap();
 
@@ -1029,7 +1027,7 @@ Hai
         setup_logging();
 
         debug!("{}", TEST_ENTRY_TNL);
-        let entry = Entry::from_str(StoreId::new_baseless(PathBuf::from("test/foo~1.3")).unwrap(),
+        let entry = Entry::from_str(StoreId::new(PathBuf::from("test/foo~1.3")).unwrap(),
                                     TEST_ENTRY_TNL).unwrap();
         let string = entry.to_str().unwrap();
 
@@ -1072,7 +1070,7 @@ mod store_tests {
             let s = format!("test-{}", n);
             let entry = store.create(PathBuf::from(s.clone())).unwrap();
             assert!(entry.verify().is_ok());
-            let loc = entry.get_location().clone().into_pathbuf().unwrap();
+            let loc = entry.get_location().clone().with_base(store.path()).into_pathbuf().unwrap();
             assert!(loc.starts_with("/"));
             assert!(loc.ends_with(s));
         }
@@ -1093,7 +1091,7 @@ mod store_tests {
 
             assert!(entry.verify().is_ok());
 
-            let loc = entry.get_location().clone().into_pathbuf().unwrap();
+            let loc = entry.get_location().clone().with_base(store.path()).into_pathbuf().unwrap();
 
             assert!(loc.starts_with("/"));
             assert!(loc.ends_with(s));
@@ -1125,7 +1123,7 @@ mod store_tests {
                 .ok()
                 .map(|entry| {
                     assert!(entry.verify().is_ok());
-                    let loc = entry.get_location().clone().into_pathbuf().unwrap();
+                    let loc = entry.get_location().clone().with_base(store.path()).into_pathbuf().unwrap();
                     assert!(loc.starts_with("/"));
                     assert!(loc.ends_with(s));
                 });
@@ -1139,12 +1137,10 @@ mod store_tests {
         let store = get_store();
 
         for n in 1..100 {
-            let pb = StoreId::new_baseless(PathBuf::from(format!("test-{}", n))).unwrap();
+            let pb = StoreId::new(PathBuf::from(format!("test-{}", n))).unwrap();
 
             assert!(store.entries.read().unwrap().get(&pb).is_none());
             assert!(store.create(pb.clone()).is_ok());
-
-            let pb = pb.with_base(store.path().clone());
             assert!(store.entries.read().unwrap().get(&pb).is_some());
         }
     }
@@ -1156,12 +1152,10 @@ mod store_tests {
         let store = get_store();
 
         for n in 1..100 {
-            let pb = StoreId::new_baseless(PathBuf::from(format!("test-{}", n))).unwrap();
+            let pb = StoreId::new(PathBuf::from(format!("test-{}", n))).unwrap();
 
             assert!(store.entries.read().unwrap().get(&pb).is_none());
             assert!(store.retrieve(pb.clone()).is_ok());
-
-            let pb = pb.with_base(store.path().clone());
             assert!(store.entries.read().unwrap().get(&pb).is_some());
         }
     }
@@ -1199,8 +1193,8 @@ mod store_tests {
 
         for n in 1..100 {
             if n % 2 == 0 { // every second
-                let id    = StoreId::new_baseless(PathBuf::from(format!("t-{}", n))).unwrap();
-                let id_mv = StoreId::new_baseless(PathBuf::from(format!("t-{}", n - 1))).unwrap();
+                let id    = StoreId::new(PathBuf::from(format!("t-{}", n))).unwrap();
+                let id_mv = StoreId::new(PathBuf::from(format!("t-{}", n - 1))).unwrap();
 
                 {
                     assert!(store.entries.read().unwrap().get(&id).is_none());
@@ -1211,16 +1205,14 @@ mod store_tests {
                 }
 
                 {
-                    let id_with_base = id.clone().with_base(store.path().clone());
-                    assert!(store.entries.read().unwrap().get(&id_with_base).is_some());
+                    assert!(store.entries.read().unwrap().get(&id).is_some());
                 }
 
                 let r = store.move_by_id(id.clone(), id_mv.clone());
                 assert!(r.map_err(|e| debug!("ERROR: {:?}", e)).is_ok());
 
                 {
-                    let id_mv_with_base = id_mv.clone().with_base(store.path().clone());
-                    assert!(store.entries.read().unwrap().get(&id_mv_with_base).is_some());
+                    assert!(store.entries.read().unwrap().get(&id_mv).is_some());
                 }
 
                 let res = store.get(id.clone());

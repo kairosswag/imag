@@ -43,87 +43,28 @@ use iter::retrieve::StoreRetrieveIterator;
 /// A StoreId object is a unique identifier for one entry in the store which might be present or
 /// not.
 ///
-#[derive(Debug, Clone, Hash, Eq, PartialOrd, Ord)]
-pub struct StoreId {
-    base: Option<PathBuf>,
-    id:   PathBuf,
-}
-
-impl PartialEq for StoreId {
-    fn eq(&self, other: &StoreId) -> bool {
-        self.id == other.id
-    }
-}
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct StoreId(PathBuf);
 
 impl StoreId {
 
-    pub fn new(base: Option<PathBuf>, id: PathBuf) -> Result<StoreId> {
-        StoreId::new_baseless(id).map(|mut sid| { sid.base = base; sid })
-    }
-
-    /// Try to create a StoreId object from a filesystem-absolute path.
-    ///
-    /// Automatically creates a StoreId object which has a `base` set to `store_part` if stripping
-    /// the `store_part` from the `full_path` succeeded.
-    pub fn from_full_path<D>(store_part: &PathBuf, full_path: D) -> Result<StoreId>
-        where D: Deref<Target = Path>
-    {
-        let p = full_path
-            .strip_prefix(store_part)
-            .map_err(Error::from)
-            .context(err_msg("Error building Store Id from full path"))?;
-        StoreId::new(Some(store_part.clone()), PathBuf::from(p))
-    }
-
-    pub fn new_baseless(id: PathBuf) -> Result<StoreId> {
+    pub fn new(id: PathBuf) -> Result<StoreId> {
         debug!("Trying to get a new baseless id from: {:?}", id);
         if id.is_absolute() {
             debug!("Error: Id is absolute!");
             Err(format_err!("Store Id local part is absolute: {}", id.display()))
         } else {
             debug!("Building Storeid object baseless");
-            Ok(StoreId {
-                base: None,
-                id
-            })
+            Ok(StoreId(id))
         }
     }
 
-    pub fn without_base(mut self) -> StoreId {
-        self.base = None;
-        self
-    }
-
-    pub fn with_base(mut self, base: PathBuf) -> Self {
-        self.base = Some(base);
-        self
-    }
-
-    /// Transform the StoreId object into a PathBuf, error if the base of the StoreId is not
-    /// specified.
-    pub fn into_pathbuf(mut self) -> Result<PathBuf> {
-        let base = self.base.take();
-        let mut base = base.ok_or_else(|| {
-            format_err!("Store Id has no base: {:?}", self.id.display().to_string())
-        })?;
-        base.push(self.id);
-        Ok(base)
-    }
-
-    /// Check whether the StoreId exists (as in whether the file exists)
-    ///
-    /// # Warning
-    ///
-    /// Should be considered deprecated
-    pub fn exists(&self) -> Result<bool> {
-        self.clone().into_pathbuf().map(|pb| pb.exists())
+    pub fn with_base<'a>(self, base: &'a PathBuf) -> StoreIdWithBase<'a> {
+        StoreIdWithBase(base, self.0)
     }
 
     pub fn to_str(&self) -> Result<String> {
-        match self.base.as_ref() {
-            None           => Ok(self.id.display().to_string()),
-            Some(ref base) => Ok(format!("{}/{}", base.display(), self.id.display())),
-        }
+        Ok(self.0.display().to_string())
     }
 
     /// Helper function for creating a displayable String from StoreId
@@ -145,12 +86,12 @@ impl StoreId {
     /// Can be used to check whether a StoreId points to an entry in a specific collection of
     /// StoreIds.
     pub fn components(&self) -> Components {
-        self.id.components()
+        self.0.components()
     }
 
     /// Get the _local_ part of a StoreId object, as in "the part from the store root to the entry".
     pub fn local(&self) -> &PathBuf {
-        &self.id
+        &self.0
     }
 
     /// Check whether a StoreId points to an entry in a specific collection.
@@ -166,7 +107,7 @@ impl StoreId {
     pub fn is_in_collection<S: AsRef<str>, V: AsRef<[S]>>(&self, colls: &V) -> bool {
         use std::path::Component;
 
-        self.id
+        self.0
             .components()
             .zip(colls.as_ref().iter())
             .all(|(component, pred_coll)| match component {
@@ -179,7 +120,7 @@ impl StoreId {
     }
 
     pub fn local_push<P: AsRef<Path>>(&mut self, path: P) {
-        self.id.push(path)
+        self.0.push(path)
     }
 
 }
@@ -187,7 +128,7 @@ impl StoreId {
 impl Display for StoreId {
 
     fn fmt(&self, fmt: &mut Formatter) -> RResult<(), FmtError> {
-        write!(fmt, "{}", self.id.display())
+        write!(fmt, "{}", self.0.display())
     }
 
 }
@@ -206,9 +147,74 @@ impl IntoStoreId for StoreId {
 
 impl IntoStoreId for PathBuf {
     fn into_storeid(self) -> Result<StoreId> {
-        StoreId::new_baseless(self)
+        StoreId::new(self)
     }
 }
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct StoreIdWithBase<'a>(&'a PathBuf, PathBuf);
+
+impl<'a> StoreIdWithBase<'a> {
+    pub(crate) fn new(base: &'a PathBuf, path: PathBuf) -> Self {
+        StoreIdWithBase(base, path)
+    }
+
+    pub(crate) fn without_base(self) -> StoreId {
+        StoreId(self.1)
+    }
+
+    /// Transform the StoreId object into a PathBuf, error if the base of the StoreId is not
+    /// specified.
+    pub(crate) fn into_pathbuf(self) -> Result<PathBuf> {
+        let mut base = self.0.clone();
+        base.push(self.1);
+        Ok(base)
+    }
+
+    /// Check whether the StoreId exists (as in whether the file exists)
+    pub fn exists(&self) -> Result<bool> {
+        self.clone().into_pathbuf().map(|pb| pb.exists())
+    }
+
+    pub fn to_str(&self) -> Result<String> {
+        let mut base = self.0.clone();
+        base.push(self.1.clone());
+        Ok(base.display().to_string())
+    }
+
+    /// Try to create a StoreId object from a filesystem-absolute path.
+    ///
+    /// Automatically creates a StoreId object which has a `base` set to `store_part` if stripping
+    /// the `store_part` from the `full_path` succeeded.
+    pub(crate) fn from_full_path<D>(store_part: &'a PathBuf, full_path: D) -> Result<StoreIdWithBase<'a>>
+        where D: Deref<Target = Path>
+    {
+        let p = full_path
+            .strip_prefix(store_part)
+            .map_err(Error::from)
+            .context(err_msg("Error building Store Id from full path"))?;
+        Ok(StoreIdWithBase(store_part, PathBuf::from(p)))
+    }
+}
+
+impl<'a> IntoStoreId for StoreIdWithBase<'a> {
+    fn into_storeid(self) -> Result<StoreId> {
+        Ok(StoreId(self.1))
+    }
+}
+
+impl<'a> Into<StoreId> for StoreIdWithBase<'a> {
+    fn into(self) -> StoreId {
+        StoreId(self.1)
+    }
+}
+
+impl<'a> Display for StoreIdWithBase<'a> {
+    fn fmt(&self, fmt: &mut Formatter) -> RResult<(), FmtError> {
+        write!(fmt, "{}/{}", self.0.display(), self.1.display())
+    }
+}
+
 
 #[macro_export]
 macro_rules! module_entry_path_mod {
@@ -249,7 +255,7 @@ macro_rules! module_entry_path_mod {
 
             impl $crate::storeid::IntoStoreId for ModuleEntryPath {
                 fn into_storeid(self) -> Result<$crate::storeid::StoreId> {
-                    StoreId::new(None, self.0)
+                    StoreId::new(self.0)
                 }
             }
         }
@@ -355,6 +361,7 @@ mod test {
     use std::path::PathBuf;
 
     use storeid::StoreId;
+    use storeid::StoreIdWithBase;
     use storeid::IntoStoreId;
 
     module_entry_path_mod!("test");
@@ -368,88 +375,63 @@ mod test {
 
     #[test]
     fn test_baseless_path() {
-        let id = StoreId::new_baseless(PathBuf::from("test"));
+        let id = StoreId::new(PathBuf::from("test"));
         assert!(id.is_ok());
-        assert_eq!(id.unwrap(), StoreId {
-            base: None,
-            id: PathBuf::from("test")
-        });
+        assert_eq!(id.unwrap(), StoreId(PathBuf::from("test")));
     }
 
     #[test]
     fn test_base_path() {
-        let id = StoreId::from_full_path(&PathBuf::from("/tmp/"), PathBuf::from("/tmp/test"));
+        let id = StoreId::new(PathBuf::from("test"));
         assert!(id.is_ok());
-        assert_eq!(id.unwrap(), StoreId {
-            base: Some(PathBuf::from("/tmp/")),
-            id: PathBuf::from("test")
-        });
+        assert_eq!(id.unwrap(), StoreId(PathBuf::from("test")));
     }
 
     #[test]
     fn test_adding_base_to_baseless_path() {
-        let id = StoreId::new_baseless(PathBuf::from("test"));
+        let id = StoreId::new(PathBuf::from("test"));
 
         assert!(id.is_ok());
         let id = id.unwrap();
 
-        assert_eq!(id, StoreId { base: None, id: PathBuf::from("test") });
+        assert_eq!(id, StoreId(PathBuf::from("test")));
 
-        let id = id.with_base(PathBuf::from("/tmp/"));
-        assert_eq!(id, StoreId {
-            base: Some(PathBuf::from("/tmp/")),
-            id: PathBuf::from("test")
-        });
+        let storebase = PathBuf::from("/tmp/");
+        let id = id.with_base(&storebase);
+        assert_eq!(id, StoreIdWithBase(&PathBuf::from("/tmp/"), PathBuf::from("test")));
     }
 
     #[test]
     fn test_removing_base_from_base_path() {
-        let id = StoreId::from_full_path(&PathBuf::from("/tmp/"), PathBuf::from("/tmp/test"));
+        let id = StoreId::new(PathBuf::from("/tmp/test"));
 
         assert!(id.is_ok());
-        let id = id.unwrap();
+        let storebase = PathBuf::from("/tmp/");
+        let id = id.unwrap().with_base(&storebase);
 
-        assert_eq!(id, StoreId {
-            base: Some(PathBuf::from("/tmp/")),
-            id: PathBuf::from("test")
-        });
+        assert_eq!(id, StoreIdWithBase(&PathBuf::from("/tmp/"), PathBuf::from("test")));
 
         let id = id.without_base();
-        assert_eq!(id, StoreId {
-            base: None,
-            id: PathBuf::from("test")
-        });
-    }
-
-    #[test]
-    fn test_baseless_into_pathbuf_is_err() {
-        let id = StoreId::new_baseless(PathBuf::from("test"));
-        assert!(id.is_ok());
-        assert!(id.unwrap().into_pathbuf().is_err());
-    }
-
-    #[test]
-    fn test_baseless_into_pathbuf_is_storeidhasnobaseerror() {
-        let id = StoreId::new_baseless(PathBuf::from("test"));
-        assert!(id.is_ok());
-
-        let pb = id.unwrap().into_pathbuf();
-        assert!(pb.is_err());
+        assert_eq!(id, StoreId(PathBuf::from("test")));
     }
 
     #[test]
     fn test_basefull_into_pathbuf_is_ok() {
-        let id = StoreId::from_full_path(&PathBuf::from("/tmp/"), PathBuf::from("/tmp/test"));
+        let id = StoreId::new(PathBuf::from("/tmp/test"));
         assert!(id.is_ok());
-        assert!(id.unwrap().into_pathbuf().is_ok());
+
+        let storebase = PathBuf::from("/tmp/");
+        let id = id.unwrap().with_base(&storebase);
+        assert!(id.into_pathbuf().is_ok());
     }
 
     #[test]
     fn test_basefull_into_pathbuf_is_correct() {
-        let id = StoreId::from_full_path(&PathBuf::from("/tmp/"), PathBuf::from("/tmp/test"));
+        let id = StoreId::new(PathBuf::from("/tmp/test"));
         assert!(id.is_ok());
 
-        let pb = id.unwrap().into_pathbuf();
+        let storebase = PathBuf::from("/tmp/");
+        let pb = id.unwrap().with_base(&storebase).into_pathbuf();
         assert!(pb.is_ok());
 
         assert_eq!(pb.unwrap(), PathBuf::from("/tmp/test"));
