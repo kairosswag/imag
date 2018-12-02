@@ -171,17 +171,6 @@ impl<'a> StoreIdWithBase<'a> {
         Ok(base)
     }
 
-    /// Check whether the StoreId exists (as in whether the file exists)
-    pub fn exists(&self) -> Result<bool> {
-        self.clone().into_pathbuf().map(|pb| pb.exists())
-    }
-
-    pub fn to_str(&self) -> Result<String> {
-        let mut base = self.0.clone();
-        base.push(self.1.clone());
-        Ok(base.display().to_string())
-    }
-
     /// Try to create a StoreId object from a filesystem-absolute path.
     ///
     /// Automatically creates a StoreId object which has a `base` set to `store_part` if stripping
