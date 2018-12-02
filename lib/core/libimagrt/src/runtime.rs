@@ -45,7 +45,6 @@ use libimagerror::errors::ErrorMsg as EM;
 use libimagerror::trace::*;
 use libimagstore::store::Store;
 use libimagstore::storeid::StoreId;
-use libimagstore::file_abstraction::InMemoryFileAbstraction;
 use libimagutil::debug_result::DebugResult;
 use spec::CliSpec;
 use atty;
@@ -137,9 +136,7 @@ impl<'a> Runtime<'a> {
         debug!("CLI         = {:?}", matches);
 
         let store_result = if cli_app.use_inmemory_fs() {
-            Store::new_with_backend(storepath,
-                                    &config,
-                                    Arc::new(InMemoryFileAbstraction::default()))
+            Store::new_inmemory(storepath, &config)
         } else {
             Store::new(storepath, &config)
         };

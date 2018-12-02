@@ -221,9 +221,7 @@ mod tests {
     use toml_query::read::TomlValueReadExt;
 
     pub fn get_store() -> Store {
-        use libimagstore::store::InMemoryFileAbstraction;
-        let backend = Arc::new(InMemoryFileAbstraction::default());
-        Store::new_with_backend(PathBuf::from("/"), &None, backend).unwrap()
+        Store::new_inmemory(PathBuf::from("/"), &None).unwrap()
     }
 
     #[test]

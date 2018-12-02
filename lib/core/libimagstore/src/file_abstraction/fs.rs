@@ -164,7 +164,7 @@ impl FileAbstraction for FSFileAbstraction {
     }
 }
 
-pub(crate) struct WalkDirPathIterBuilder {
+pub struct WalkDirPathIterBuilder {
     basepath: PathBuf
 }
 

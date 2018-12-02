@@ -59,7 +59,7 @@ impl StoreId {
         }
     }
 
-    pub fn with_base<'a>(self, base: &'a PathBuf) -> StoreIdWithBase<'a> {
+    pub(crate) fn with_base<'a>(self, base: &'a PathBuf) -> StoreIdWithBase<'a> {
         StoreIdWithBase(base, self.0)
     }
 
@@ -155,6 +155,7 @@ impl IntoStoreId for PathBuf {
 pub(crate) struct StoreIdWithBase<'a>(&'a PathBuf, PathBuf);
 
 impl<'a> StoreIdWithBase<'a> {
+    #[cfg(test)]
     pub(crate) fn new(base: &'a PathBuf, path: PathBuf) -> Self {
         StoreIdWithBase(base, path)
     }

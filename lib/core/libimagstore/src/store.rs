@@ -43,12 +43,10 @@ use failure::Error;
 
 use storeid::{IntoStoreId, StoreId};
 use iter::Entries;
+use file_abstraction::FileAbstraction;
 use file_abstraction::FileAbstractionInstance;
-
-// We re-export the following things so tests can use them
-pub use file_abstraction::FileAbstraction;
-pub use file_abstraction::FSFileAbstraction;
-pub use file_abstraction::InMemoryFileAbstraction;
+use file_abstraction::fs::FSFileAbstraction;
+use file_abstraction::inmemory::InMemoryFileAbstraction;
 
 use libimagutil::debug_result::*;
 
@@ -172,13 +170,24 @@ impl Store {
         Store::new_with_backend(location, store_config, backend)
     }
 
+    /// Create the store with an in-memory filesystem
+    ///
+    /// # Usage
+    ///
+    /// this is for testing purposes only
+    #[inline]
+    pub fn new_inmemory(location: PathBuf, store_config: &Option<Value>) -> Result<Store> {
+        let backend = Arc::new(InMemoryFileAbstraction::default());
+        Self::new_with_backend(location, store_config, backend)
+    }
+
     /// Create a Store object as descripbed in `Store::new()` documentation, but with an alternative
     /// backend implementation.
     ///
     /// Do not use directly, only for testing purposes.
-    pub fn new_with_backend(location: PathBuf,
-                            store_config: &Option<Value>,
-                            backend: Arc<FileAbstraction>) -> Result<Store> {
+    fn new_with_backend(location: PathBuf,
+                        store_config: &Option<Value>,
+                        backend: Arc<FileAbstraction>) -> Result<Store> {
         use configuration::*;
 
         debug!("Building new Store object");
@@ -1047,9 +1056,9 @@ mod store_tests {
     }
 
     use super::Store;
-    use file_abstraction::InMemoryFileAbstraction;
 
     pub fn get_store() -> Store {
+        use file_abstraction::inmemory::InMemoryFileAbstraction;
         let backend = Arc::new(InMemoryFileAbstraction::default());
         Store::new_with_backend(PathBuf::from("/"), &None, backend).unwrap()
     }

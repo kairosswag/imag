@@ -58,5 +58,5 @@ pub mod storeid;
 pub mod iter;
 pub mod store;
 mod configuration;
-pub mod file_abstraction;
+mod file_abstraction;
 

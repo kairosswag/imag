@@ -27,18 +27,14 @@ use failure::Fallible as Result;
 use store::Entry;
 use storeid::StoreIdWithBase;
 
-mod fs;
-mod inmemory;
-pub(crate) mod iter;
+pub mod fs;
+pub mod inmemory;
+pub mod iter;
 
-pub use self::fs::FSFileAbstraction;
-pub use self::fs::FSFileAbstractionInstance;
-pub use self::inmemory::InMemoryFileAbstraction;
-pub use self::inmemory::InMemoryFileAbstractionInstance;
 use self::iter::PathIterator;
 
 /// An abstraction trait over filesystem actions
-pub trait FileAbstraction : Debug {
+pub(crate) trait FileAbstraction : Debug {
     fn remove_file(&self, path: &PathBuf) -> Result<()>;
     fn copy(&self, from: &PathBuf, to: &PathBuf) -> Result<()>;
     fn rename(&self, from: &PathBuf, to: &PathBuf) -> Result<()>;
@@ -56,7 +52,7 @@ pub trait FileAbstraction : Debug {
 }
 
 /// An abstraction trait over actions on files
-pub trait FileAbstractionInstance : Debug {
+pub(crate) trait FileAbstractionInstance : Debug {
 
     /// Get the contents of the FileAbstractionInstance, as Entry object.
     ///

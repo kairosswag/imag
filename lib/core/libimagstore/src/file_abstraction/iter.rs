@@ -26,7 +26,7 @@ use storeid::StoreIdWithBase;
 use file_abstraction::FileAbstraction;
 
 /// See documentation for PathIterator
-pub trait PathIterBuilder {
+pub(crate) trait PathIterBuilder {
     fn build_iter(&self) -> Box<Iterator<Item = Result<PathBuf>>>;
     fn in_collection(&mut self, c: &str);
 }

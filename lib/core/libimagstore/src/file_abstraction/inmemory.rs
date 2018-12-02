@@ -203,7 +203,7 @@ impl FileAbstraction for InMemoryFileAbstraction {
     }
 }
 
-pub(crate) struct InMemPathIterBuilder(Vec<PathBuf>);
+pub struct InMemPathIterBuilder(Vec<PathBuf>);
 
 impl PathIterBuilder for InMemPathIterBuilder {
     fn build_iter(&self) -> Box<Iterator<Item = Result<PathBuf>>> {
