@@ -37,23 +37,6 @@ use std::path::PathBuf;
 
 use url::Url;
 
-
-pub struct UniqueMarkdownRefGenerator;
-
-impl UniqueRefPathGenerator for UniqueMarkdownRefGenerator {
-    fn collection() -> &'static str {
-        "ref" // we can only use this collection, as we don't know about context
-    }
-
-    fn unique_hash<A: AsRef<Path>>(path: A) -> Result<String> {
-        Sha512::unique_hash(path).map_err(Error::from)
-    }
-
-    fn postprocess_storeid(sid: StoreId) -> Result<StoreId> {
-        Ok(sid) // don't do anything
-    }
-}
-
 /// A link Processor which collects the links from a Markdown and passes them on to
 /// `libimagentrylink` functionality
 ///
@@ -117,10 +100,36 @@ impl LinkProcessor {
 
     /// Process an Entry for its links
     ///
+    ///
+    /// # Notice
+    ///
+    /// Whenever a "ref" is created, that means when a URL points to a filesystem path (normally
+    /// when using `file:///home/user/foobar.file` for example), the _current_ implementation uses
+    /// libimagentryref to create make the entry into a ref.
+    ///
+    /// The configuration of the `libimagentryref::reference::Reference::make_ref()` call is as
+    /// follows:
+    ///
+    /// * Name of the collection: "root"
+    /// * Configuration: `{"root": "/"}`
+    ///
+    /// This implementation might change in the future, so that the configuration and the name of
+    /// the collection can be passed to the function, or in a way that the user is asked what to do
+    /// during the runtime of this function.
+    ///
+    ///
     /// # Warning
     ///
     /// When `LinkProcessor::create_internal_targets()` was called to set the setting to true, this
     /// function returns all errors returned by the Store.
+    ///
+    /// That means:
+    ///
+    /// * For an internal link, the linked target is created if create_internal_targets() is true,
+    ///   else error
+    /// * For an external link, if create_internal_targets() is true, libimagentrylink creates the
+    ///   external link entry, else the link is ignored
+    /// * all other cases do not create elements in the store
     ///
     pub fn process<'a>(&self, entry: &mut Entry, store: &'a Store) -> Result<()> {
         let text = entry.to_str()?;
@@ -156,14 +165,21 @@ impl LinkProcessor {
                         continue
                     }
 
+                    let ref_collection_name = "root";
+
+                    let ref_collection_config = {
+                        let mut map = BTreeMap::new();
+                        map.insert(String::from("root"), PathBuf::from("/"));
+                        map
+                    };
+
                     trace!("URL            = {:?}", url);
                     trace!("URL.path()     = {:?}", url.path());
                     trace!("URL.host_str() = {:?}", url.host_str());
                     let path = url.host_str().unwrap_or_else(|| url.path());
                     let path = PathBuf::from(path);
-                    let mut target = store.create_ref::<UniqueMarkdownRefGenerator, PathBuf>(path)?;
 
-                    entry.add_internal_link(&mut target)?;
+                    entry.make_ref(path, ref_collection_name, ref_collection_config, false)
                 },
                 LinkQualification::Undecidable(e) => {
                     // error
