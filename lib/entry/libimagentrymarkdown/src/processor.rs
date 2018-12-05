@@ -26,9 +26,7 @@ use link::extract_links;
 
 use libimagentrylink::external::ExternalLinker;
 use libimagentrylink::internal::InternalLinker;
-use libimagentryref::refstore::RefStore;
-use libimagentryref::refstore::UniqueRefPathGenerator;
-use libimagentryref::generators::sha512::Sha512;
+use libimagentryref::reference::Ref;
 use libimagstore::store::Entry;
 use libimagstore::store::Store;
 use libimagstore::storeid::StoreId;
