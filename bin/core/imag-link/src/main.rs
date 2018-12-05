@@ -168,8 +168,8 @@ fn link_from_to<'a, I>(rt: &'a Runtime, from: &'a str, to: I)
         } else {
             debug!("Linking internally: {:?} -> {:?}", from, entry);
 
-            let from_id = StoreId::new_baseless(PathBuf::from(from)).map_err_trace_exit_unwrap(1);
-            let entr_id = StoreId::new_baseless(PathBuf::from(entry)).map_err_trace_exit_unwrap(1);
+            let from_id = StoreId::new(PathBuf::from(from)).map_err_trace_exit_unwrap(1);
+            let entr_id = StoreId::new(PathBuf::from(entry)).map_err_trace_exit_unwrap(1);
 
             if from_id == entr_id {
                 error!("Cannot link entry with itself. Exiting");
@@ -380,13 +380,13 @@ mod tests {
         let mut path = PathBuf::new();
         path.set_file_name(name);
 
-        let default_entry = Entry::new(StoreId::new_baseless(PathBuf::from("")).unwrap())
+        let default_entry = Entry::new(StoreId::new(PathBuf::from("")).unwrap())
             .to_str()
             .unwrap();
 
         debug!("Default entry constructed");
 
-        let id = StoreId::new_baseless(path)?;
+        let id = StoreId::new(path)?;
         debug!("StoreId constructed: {:?}", id);
 
         let mut entry = rt.store().create(id.clone())?;

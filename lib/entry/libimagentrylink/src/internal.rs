@@ -580,7 +580,7 @@ fn process_rw_result(links: Result<Option<Value>>) -> Result<LinkIter> {
         .map(|link| {
             debug!("Matching the link: {:?}", link);
             match link {
-                Value::String(s) => StoreId::new_baseless(PathBuf::from(s))
+                Value::String(s) => StoreId::new(PathBuf::from(s))
                     .map(|s| Link::Id { link: s })
                     .map_err(From::from)
                     ,
@@ -600,7 +600,7 @@ fn process_rw_result(links: Result<Option<Value>>) -> Result<LinkIter> {
                         debug!("Ok, here we go with building a Link::Annotated");
                         match (link, anno) {
                             (Value::String(link), Value::String(anno)) => {
-                                StoreId::new_baseless(PathBuf::from(link))
+                                StoreId::new(PathBuf::from(link))
                                     .map_err(From::from)
                                     .map(|link| {
                                         Link::Annotated {

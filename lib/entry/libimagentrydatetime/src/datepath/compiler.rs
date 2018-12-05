@@ -119,7 +119,7 @@ impl DatePathCompiler {
             }
         }
 
-        StoreId::new_baseless(PathBuf::from(s))
+        StoreId::new(PathBuf::from(s))
     }
 
 }

@@ -65,7 +65,7 @@ impl<'a> From<&'a String> for TimeTrackingTag {
 
 impl IntoStoreId for TimeTrackingTag {
     fn into_storeid(self) -> Result<StoreId> {
-        StoreId::new_baseless(PathBuf::from(self.0))
+        StoreId::new(PathBuf::from(self.0))
     }
 }
 

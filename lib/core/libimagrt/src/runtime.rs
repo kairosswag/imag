@@ -405,7 +405,7 @@ impl<'a> Runtime<'a> {
                     trace!("Got IDs = {}", buf);
                     buf.lines()
                         .map(PathBuf::from)
-                        .map(|id| StoreId::new_baseless(id).map_err(Error::from))
+                        .map(|id| StoreId::new(id).map_err(Error::from))
                         .collect()
                 })
         } else {

@@ -55,7 +55,7 @@ pub fn get_id(matches: &ArgMatches) -> Result<Vec<StoreId>> {
             vals.into_iter()
                 .fold(Ok(vec![]), |acc, elem| {
                     acc.and_then(|mut v| {
-                        let elem = StoreId::new_baseless(PathBuf::from(String::from(elem)))?;
+                        let elem = StoreId::new(PathBuf::from(String::from(elem)))?;
                         v.push(elem);
                         Ok(v)
                     })
@@ -70,7 +70,7 @@ pub fn get_or_select_id(matches: &ArgMatches, store_path: &PathBuf) -> Result<Ve
         .or_else(|_| {
             let path = store_path.clone();
             let p    = pick_file(default_menu_cmd, path)?;
-            let id   = StoreId::new_baseless(p)?;
+            let id   = StoreId::new(p)?;
             Ok(vec![id])
         })
 }
