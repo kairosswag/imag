@@ -17,7 +17,7 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 //
 
-use std::path::Path;
+use std::collections::BTreeMap;
 
 use failure::Fallible as Result;
 use failure::ResultExt;
