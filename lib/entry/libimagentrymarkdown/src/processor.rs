@@ -170,7 +170,7 @@ impl LinkProcessor {
                     let ref_collection_config = {
                         let mut map = BTreeMap::new();
                         map.insert(String::from("root"), PathBuf::from("/"));
-                        map
+                        ::libimagentryref::reference::Config::new(map)
                     };
 
                     trace!("URL            = {:?}", url);
