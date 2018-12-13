@@ -652,7 +652,7 @@ impl Store {
                 .context(format_err!("CreateCallError: {}", id));
 
         let backend_has_entry = |id: StoreId|
-            self.backend.exists(&id.with_base(self.path().to_path_buf()).into_pathbuf()?);
+            self.backend.exists(&id.with_base(self.path()).into_pathbuf()?);
 
         Ok(cache_has_entry(&id)? || backend_has_entry(id)?)
     }
