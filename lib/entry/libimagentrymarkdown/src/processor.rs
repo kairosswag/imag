@@ -177,7 +177,7 @@ impl LinkProcessor {
                     let path = url.host_str().unwrap_or_else(|| url.path());
                     let path = PathBuf::from(path);
 
-                    entry.make_ref(path, ref_collection_name, ref_collection_config, false)
+                    entry.make_ref(path, ref_collection_name, ref_collection_config, false)?;
                 },
                 LinkQualification::Undecidable(e) => {
                     // error
