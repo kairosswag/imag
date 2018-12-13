@@ -82,9 +82,9 @@ impl Link {
     /// Helper wrapper around Link for StoreId
     fn without_base(self) -> Link {
         match self {
-            Link::Id { link: s } => Link::Id { link: s.without_base() },
+            Link::Id { link: s } => Link::Id { link: s },
             Link::Annotated { link: s, annotation: ann } =>
-                Link::Annotated { link: s.without_base(), annotation: ann },
+                Link::Annotated { link: s, annotation: ann },
         }
     }
 
@@ -447,22 +447,22 @@ impl InternalLinker for Entry {
 
     fn remove_internal_link(&mut self, link: &mut Entry) -> Result<()> {
         debug!("Removing internal link: {:?}", link);
-        let own_loc   = self.get_location().clone().without_base();
-        let other_loc = link.get_location().clone().without_base();
+        let own_loc   = self.get_location();
+        let other_loc = link.get_location();
 
         debug!("Removing internal link from {:?} to {:?}", own_loc, other_loc);
 
         link.get_internal_links()
             .and_then(|links| {
                 debug!("Rewriting own links for {:?}, without {:?}", other_loc, own_loc);
-                let links = links.filter(|l| !l.eq_store_id(&own_loc));
+                let links = links.filter(|l| !l.eq_store_id(own_loc));
                 rewrite_links(link.get_header_mut(), links)
             })
             .and_then(|_| {
                 self.get_internal_links()
                     .and_then(|links| {
                         debug!("Rewriting own links for {:?}, without {:?}", own_loc, other_loc);
-                        let links = links.filter(|l| !l.eq_store_id(&other_loc));
+                        let links = links.filter(|l| !l.eq_store_id(other_loc));
                         rewrite_links(self.get_header_mut(), links)
                     })
             })
@@ -694,7 +694,7 @@ pub mod store_check {
                     if is_match!(self.get(id.clone()), Ok(Some(_))) {
                         debug!("Exists in store: {:?}", id);
 
-                        if !id.exists()? {
+                        if !self.exists(id.clone())? {
                             warn!("Does exist in store but not on FS: {:?}", id);
                             return Err(err_msg("Link target does not exist"))
                         }
