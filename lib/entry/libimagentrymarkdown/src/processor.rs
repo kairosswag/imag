@@ -27,6 +27,7 @@ use link::extract_links;
 use libimagentrylink::external::ExternalLinker;
 use libimagentrylink::internal::InternalLinker;
 use libimagentryref::reference::Ref;
+use libimagentryref::hasher::sha1::Sha1Hasher;
 use libimagstore::store::Entry;
 use libimagstore::store::Store;
 use libimagstore::storeid::StoreId;
@@ -179,7 +180,9 @@ impl LinkProcessor {
                     let path = url.host_str().unwrap_or_else(|| url.path());
                     let path = PathBuf::from(path);
 
-                    entry.make_ref(path, ref_collection_name, &ref_collection_config, false)?;
+                    // TODO: Why do I have to pass the type parameter here? I thought that would be
+                    // inferred?
+                    Ref::<Sha1Hasher>::make_ref(entry, path, ref_collection_name, &ref_collection_config, false)?;
                 },
                 LinkQualification::Undecidable(e) => {
                     // error
