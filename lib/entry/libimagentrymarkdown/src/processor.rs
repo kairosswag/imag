@@ -165,6 +165,8 @@ impl LinkProcessor {
 
                     let ref_collection_name = "root";
 
+                    // TODO: Maybe this can be a const?
+                    // TODO: Maybe we need this ot be overrideable? Not sure.
                     let ref_collection_config = {
                         let mut map = BTreeMap::new();
                         map.insert(String::from("root"), PathBuf::from("/"));
@@ -177,7 +179,7 @@ impl LinkProcessor {
                     let path = url.host_str().unwrap_or_else(|| url.path());
                     let path = PathBuf::from(path);
 
-                    entry.make_ref(path, ref_collection_name, ref_collection_config, false)?;
+                    entry.make_ref(path, ref_collection_name, &ref_collection_config, false)?;
                 },
                 LinkQualification::Undecidable(e) => {
                     // error
