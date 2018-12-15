@@ -27,6 +27,7 @@ use failure::Fallible as Result;
 use failure::ResultExt;
 use toml::Value;
 use toml_query::insert::TomlValueInsertExt;
+use email::MimeMessage;
 
 use libimagstore::store::FileLockEntry;
 use libimagstore::store::Store;
