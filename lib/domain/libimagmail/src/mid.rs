@@ -17,39 +17,11 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 //
 
-//! Module for the MailIter
-//!
-//! MailIter is a iterator which takes an Iterator that yields `Ref` and yields itself
-//! `Result<Mail>`, where `Err(_)` is returned if the Ref is not a Mail or parsing of the
-//! referenced mail file failed.
-//!
-
-use mail::Mail;
-use failure::Fallible as Result;
-
-use libimagstore::store::FileLockEntry;
-
-use std::marker::PhantomData;
-
-pub struct MailIter<'a, I: Iterator<Item = FileLockEntry<'a>>> {
-    _marker: PhantomData<I>,
-    i: I,
-}
-
-impl<'a, I: Iterator<Item = FileLockEntry<'a>>> MailIter<'a, I> {
-
-    pub fn new(i: I) -> MailIter<'a, I> {
-        MailIter { _marker: PhantomData, i: i }
-    }
-
-}
-
-impl<'a, I: Iterator<Item = FileLockEntry<'a>>> Iterator for MailIter<'a, I> {
-    type Item = Result<Mail<'a>>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.i.next().map(Mail::from_fle)
-    }
-
-}
+/// Helper type for handling message IDs
+///
+/// Message IDs are used to identfy emails uniquely, so we should at least have a type for
+/// representing them and make handling a bit easier.
+///
+#[derive(Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct MessageId(String);
 
