@@ -104,7 +104,7 @@ fn get_message_id_for_mailfile<P: AsRef<Path> + Debug>(p: P) -> Result<String> {
         .read(true)
         .write(false)
         .create(false)
-        .open(path)?
+        .open(p)?
         .read_to_string(&mut s)?;
 
     MimeMessage::parse(&s)
