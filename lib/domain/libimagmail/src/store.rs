@@ -35,7 +35,7 @@ use libimagstore::storeid::StoreIdIterator;
 use libimagentryref::reference::Config;
 use libimagentryref::reference::Ref;
 
-use module_entry_path::ModuleEntryPath;
+use module_path::ModuleEntryPath;
 use mid::MessageId;
 
 pub trait MailStore<'a> {
