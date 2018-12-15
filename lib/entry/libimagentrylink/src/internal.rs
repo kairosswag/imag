@@ -47,10 +47,10 @@ pub enum Link {
 
 impl Link {
 
-    pub fn exists(&self) -> Result<bool> {
+    pub fn exists(&self, store: &Store) -> Result<bool> {
         match *self {
-            Link::Id { ref link }             => link.exists(),
-            Link::Annotated { ref link, .. }  => link.exists(),
+            Link::Id { ref link }             => store.exists(link.clone()),
+            Link::Annotated { ref link, .. }  => store.exists(link.clone()),
         }
         .map_err(From::from)
     }
