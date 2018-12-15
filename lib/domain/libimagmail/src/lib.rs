@@ -37,6 +37,8 @@
 
 #[macro_use] extern crate log;
 extern crate email;
+extern crate toml;
+extern crate toml_query;
 extern crate filters;
 #[macro_use] extern crate failure;
 extern crate serde;

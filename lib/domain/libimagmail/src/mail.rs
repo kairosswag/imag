@@ -21,6 +21,7 @@ use std::collections::BTreeMap;
 use std::ops::Deref;
 
 use failure::Fallible as Result;
+use toml_query::read::TomlValueReadExt;
 
 use libimagstore::store::Entry;
 

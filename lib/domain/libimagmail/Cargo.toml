@@ -21,6 +21,8 @@ maintenance                       = { status     = "actively-developed" }
 
 [dependencies]
 log = "0.4.0"
+toml = "0.4"
+toml-query = "0.8"
 email = "0.0.20"
 filters = "0.3"
 failure = "0.1"
