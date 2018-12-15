@@ -26,21 +26,58 @@ use failure::err_msg;
 
 use libimagstore::store::FileLockEntry;
 use libimagstore::store::Store;
+use libimagentryref::reference::Config;
 
 pub trait MailStore<'a> {
-    fn get_mail_from_path<P: AsRef<Path>>(&'a self, p: P)      -> Result<Option<FileLockEntry<'a>>>;
-    fn retrieve_mail_from_path<P: AsRef<Path>>(&'a self, p: P) -> Result<FileLockEntry<'a>>;
+    fn get_mail_from_path<P, CollName>(&'a self, p: P, collection_name: CollName, config: &Config)
+        -> Result<Option<FileLockEntry<'a>>>
+        where P: AsRef<Path>,
+              CollName: AsRef<str> + Debug;
+
+    fn retrieve_mail_from_path<P, CollName>(&'a self, p: P, collection_name: CollName, config: &Config)
+        -> Result<FileLockEntry<'a>>
+        where P: AsRef<Path>,
+              CollName: AsRef<str> + Debug;
+
     fn get_mail(&'a self, mid: MessageId)                      -> Result<Option<FileLockEntry<'a>>>;
     fn all_mails(&'a self)                                     -> Result<StoreIdIterator>;
 }
 
 impl<'a> MailStore<'a> for Store {
-    fn get_mail_from_path<P: AsRef<Path>>(&'a self, p: P) -> Result<Option<FileLockEntry<'a>>> {
-        unimplemented!()
+    fn get_mail_from_path<P, CollName>(&'a self, p: P, collection_name: CollName, config: &Config)
+        -> Result<Option<FileLockEntry<'a>>>
+        where P: AsRef<Path>,
+              CollName: AsRef<str> + Debug
+    {
+        let message_id = get_message_id_for_mailfile(p)?;
+        let new_sid    = ModuleEntryPath::new(message_id.clone()).into_storeid()?;
+
+        match self.get(new_sid)? {
+            Some(mut entry) => {
+                if !entry.is_ref()? {
+                    unimplemented!()
+                    // TODO: FLE is not a ref.. something went wrong ...
+                    // error out here
+                }
+                let _ = entry.get_header_mut().insert("mail.message-id", Value::String(message_id))?;
+                Ok(Some(entry))
+            },
+            None => Ok(None),
+        }
     }
 
-    fn retrieve_mail_from_path<P: AsRef<Path>>(&'a self, p: P) -> Result<FileLockEntry<'a>> {
-        unimplemented!()
+    fn retrieve_mail_from_path<P, CollName>(&'a self, p: P, collection_name: CollName, config: &Config)
+        -> Result<FileLockEntry<'a>>
+        where P: AsRef<Path>,
+              CollName: AsRef<str> + Debug;
+    {
+        let message_id = get_message_id_for_mailfile(&p)?;
+        let new_sid    = ModuleEntryPath::new(message_id.clone()).into_storeid()?;
+        let mut entry  = self.retrieve(new_sid)?;
+        let _ = entry.get_header_mut().insert("mail.message-id", Value::String(message_id))?;
+        let _ = entry.make_ref(p, collection_name, config, false)?;
+
+        Ok(entry)
     }
 
     fn get_mail(&'a self, mid: MessageId) -> Result<Option<FileLockEntry<'a>>> {
@@ -50,4 +87,23 @@ impl<'a> MailStore<'a> for Store {
     fn all_mails(&'a self) -> Result<StoreIdIterator> {
         unimplemented!()
     }
+}
+
+fn get_message_id_for_mailfile<P: AsRef<Path>>(p: P) -> Result<> {
+    let mut s = String::new();
+    let _     = OpenOptions::new()
+        .read(true)
+        .write(false)
+        .create(false)
+        .open(path)?
+        .read_to_string(&mut s)?;
+
+    MimeMessage::parse(&s)
+        .context(format_err!("Cannot parse Email {}", p.display()))?
+        .headers
+        .get(String::from("Message-Id"))
+        .ok_or_else(format_err!("Message has no 'Message-Id': {}", p.display()))?
+        .get_value::<String>()
+        .context(format_err!("Cannot decode header value in 'Message-Id': {}", p.display()))
+        .map_err(Error::from)
 }
