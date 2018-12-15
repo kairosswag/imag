@@ -44,6 +44,7 @@ extern crate libimagerror;
 extern crate libimagstore;
 extern crate libimagentryref;
 
+pub mod config;
 pub mod mail;
 pub mod mid;
 pub mod store;
