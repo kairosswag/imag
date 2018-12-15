@@ -17,24 +17,12 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 //
 
-use std::path::Path;
-use std::fs::File;
-use std::io::Read;
-use std::fs::OpenOptions;
-
-use libimagstore::store::Store;
-use libimagstore::storeid::StoreId;
-use libimagstore::store::FileLockEntry;
-use libimagentryref::reference::Ref;
-use libimagerror::errors::ErrorMsg as EM;
-
-use email::MimeMessage;
-use email::results::ParsingResult as EmailParsingResult;
+use std::collections::BTreeMap;
+use std::ops::Deref;
 
 use failure::Fallible as Result;
-use failure::ResultExt;
-use failure::Error;
-use failure::err_msg;
+
+use libimagstore::store::Entry;
 
 pub trait Mail {
     fn mail_header(&self)            -> Result<MailHeader>;

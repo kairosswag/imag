@@ -18,26 +18,31 @@
 //
 
 use std::path::Path;
+use std::fs::OpenOptions;
 
 use failure::Error;
 use failure::Fallible as Result;
 use failure::ResultExt;
-use failure::err_msg;
+use toml::Value;
 
 use libimagstore::store::FileLockEntry;
 use libimagstore::store::Store;
+use libimagstore::storeid::StoreIdIterator;
 use libimagentryref::reference::Config;
+
+use module_entry_path::ModuleEntryPath;
+use mid::MessageId;
 
 pub trait MailStore<'a> {
     fn get_mail_from_path<P, CollName>(&'a self, p: P, collection_name: CollName, config: &Config)
         -> Result<Option<FileLockEntry<'a>>>
         where P: AsRef<Path>,
-              CollName: AsRef<str> + Debug;
+              CollName: AsRef<str>;
 
     fn retrieve_mail_from_path<P, CollName>(&'a self, p: P, collection_name: CollName, config: &Config)
         -> Result<FileLockEntry<'a>>
         where P: AsRef<Path>,
-              CollName: AsRef<str> + Debug;
+              CollName: AsRef<str>;
 
     fn get_mail(&'a self, mid: MessageId)                      -> Result<Option<FileLockEntry<'a>>>;
     fn all_mails(&'a self)                                     -> Result<StoreIdIterator>;
@@ -47,7 +52,7 @@ impl<'a> MailStore<'a> for Store {
     fn get_mail_from_path<P, CollName>(&'a self, p: P, collection_name: CollName, config: &Config)
         -> Result<Option<FileLockEntry<'a>>>
         where P: AsRef<Path>,
-              CollName: AsRef<str> + Debug
+              CollName: AsRef<str>
     {
         let message_id = get_message_id_for_mailfile(p)?;
         let new_sid    = ModuleEntryPath::new(message_id.clone()).into_storeid()?;
@@ -69,7 +74,7 @@ impl<'a> MailStore<'a> for Store {
     fn retrieve_mail_from_path<P, CollName>(&'a self, p: P, collection_name: CollName, config: &Config)
         -> Result<FileLockEntry<'a>>
         where P: AsRef<Path>,
-              CollName: AsRef<str> + Debug;
+              CollName: AsRef<str>
     {
         let message_id = get_message_id_for_mailfile(&p)?;
         let new_sid    = ModuleEntryPath::new(message_id.clone()).into_storeid()?;
@@ -89,7 +94,7 @@ impl<'a> MailStore<'a> for Store {
     }
 }
 
-fn get_message_id_for_mailfile<P: AsRef<Path>>(p: P) -> Result<> {
+fn get_message_id_for_mailfile<P: AsRef<Path>>(p: P) -> Result<String> {
     let mut s = String::new();
     let _     = OpenOptions::new()
         .read(true)
