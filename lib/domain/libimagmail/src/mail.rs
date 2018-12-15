@@ -21,6 +21,7 @@ use std::collections::BTreeMap;
 use std::ops::Deref;
 
 use failure::Fallible as Result;
+use failure::err_msg;
 use toml_query::read::TomlValueReadExt;
 
 use libimagstore::store::Entry;
@@ -54,9 +55,9 @@ impl Mail for Entry {
         debug!("Getting field in mail: {:?}", field);
         let mail_file_location = self.get_header()
             .read("mail.file")?
-            .ok_or_else(|| unimplemented!() /* missing header field */)?
+            .ok_or_else(|| err_msg("Missing header field: 'mail.file'"))?
             .as_str()
-            .ok_or_else(|| unimplemented!() /* wrong header type */)?;
+            .ok_or_else(|| err_msg("Missing header field type: 'mail.file' should be String")?;
 
         unimplemented!()
         /*
