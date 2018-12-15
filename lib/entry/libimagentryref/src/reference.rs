@@ -20,7 +20,6 @@
 use std::path::Path;
 use std::path::PathBuf;
 use std::collections::BTreeMap;
-use std::fmt::Debug;
 use std::ops::Deref;
 
 use libimagentryutil::isa::Is;
@@ -90,8 +89,8 @@ pub trait Ref<H : Hasher = Sha1Hasher> {
     /// If the entry is already a ref, this fails if `force` is false
     fn make_ref<P, Coll>(&mut self, path: P, collection_name: Coll, config: &Config, force: bool)
         -> Result<()>
-        where P: AsRef<Path> + Debug,
-              Coll: AsRef<str> + Debug;
+        where P: AsRef<Path>,
+              Coll: AsRef<str>;
 }
 
 provide_kindflag_path!(pub IsRef, "ref.is_ref");
@@ -184,8 +183,8 @@ impl<H: Hasher> Ref<H> for Entry {
     ///
     fn make_ref<P, Coll>(&mut self, path: P, collection_name: Coll, config: &Config, force: bool)
         -> Result<()>
-        where P: AsRef<Path> + Debug,
-              Coll: AsRef<str> + Debug
+        where P: AsRef<Path>,
+              Coll: AsRef<str>
     {
         if !force && self.is::<IsRef>()? {
             let _ = Err(err_msg("Entry is already a reference")).context("Making ref out of entry")?;
@@ -216,7 +215,7 @@ impl<H: Hasher> Ref<H> for Entry {
 /// The `relpath` _must_ be relative to the configured path for that collection.
 pub(crate) fn make_header_section<P, C, H>(hash: String, hashname: H, relpath: P, collection: C)
     -> Result<Value>
-    where P: AsRef<Path> + Debug,
+    where P: AsRef<Path>,
           C: AsRef<str>,
           H: AsRef<str>,
 {
@@ -246,7 +245,7 @@ pub(crate) fn make_header_section<P, C, H>(hash: String, hashname: H, relpath: P
 }
 
 fn get_file_path<P>(config: &Config, collection_name: &str, path: P) -> Result<PathBuf>
-        where P: AsRef<Path> + Debug
+        where P: AsRef<Path>
 {
     config
         .get(collection_name)
