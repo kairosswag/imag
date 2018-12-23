@@ -452,7 +452,7 @@ impl InternalLinker for Entry {
 
         debug!("Removing internal link from {:?} to {:?}", own_loc, other_loc);
 
-        let links = link.get_internal_links()?
+        let links = link.get_internal_links()?;
         debug!("Rewriting own links for {:?}, without {:?}", other_loc, own_loc);
 
         let links = links.filter(|l| !l.eq_store_id(own_loc));
