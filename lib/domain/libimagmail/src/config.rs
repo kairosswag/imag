@@ -17,6 +17,8 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 //
 
+use std::path::PathBuf;
+
 /// A struct representing a full mail configuration, required for working with this library
 ///
 /// For convenience reasons, this implements Serialize and Deserialize, so it can be fetched from a
