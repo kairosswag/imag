@@ -46,21 +46,66 @@ impl MailConfig {
         &self.accounts
     }
 
-    pub fn fetchcommand -> &String {
+    pub fn fetchcommand(&self) -> &String {
         &self.fetchcommand
     }
 
-    pub fn postfetchcommand -> Option<&String> {
+    pub fn postfetchcommand(&self) -> Option<&String> {
         &self.postfetchcommand
     }
 
-    pub fn sendcommand -> &String {
+    pub fn sendcommand(&self) -> &String {
         &self.sendcommand
     }
 
-    pub fn postsendcommand -> Option<&String> {
+    pub fn postsendcommand(&self) -> Option<&String> {
         &self.postsendcommand
     }
+
+    pub fn fetchcommand_for_account(&self, account_name: &str) -> &String {
+        self.accounts()
+            .iter()
+            .filter(|a| a.name == account_name())
+            .map(|a| a.fetchcommand)
+            .next()
+            .unwrap_or_else(|| {
+                self.fetchcommand()
+            })
+    }
+
+    pub fn postfetchcommand_for_account(&self, account_name: &str) -> Option<&String> {
+        self.accounts()
+            .iter()
+            .filter(|a| a.name == account_name())
+            .next()
+            .and_then(|a| a.postfetchcommand)
+            .unwrap_or_else(|| {
+                self.fetchcommand()
+            })
+    }
+
+    pub fn sendcommand_for_account(&self, account_name: &str) -> &String {
+        self.accounts()
+            .iter()
+            .filter(|a| a.name == account_name())
+            .map(|a| a.sendcommand)
+            .next()
+            .unwrap_or_else(|| {
+                self.sendcommand()
+            })
+    }
+
+    pub fn postsendcommand_for_account(&self, account_name: &str) -> Option<&String> {
+        self.accounts()
+            .iter()
+            .filter(|a| a.name == account_name())
+            .next()
+            .and_then(|a| a.postsendcommand)
+            .unwrap_or_else(|| {
+                self.postsendcommand()
+            })
+    }
+
 }
 
 /// A configuration for a single mail accounts
