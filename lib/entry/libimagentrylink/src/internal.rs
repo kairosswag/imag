@@ -452,19 +452,17 @@ impl InternalLinker for Entry {
 
         debug!("Removing internal link from {:?} to {:?}", own_loc, other_loc);
 
-        link.get_internal_links()
+        let links = link.get_internal_links()?
+        debug!("Rewriting own links for {:?}, without {:?}", other_loc, own_loc);
+
+        let links = links.filter(|l| !l.eq_store_id(own_loc));
+        let _     = rewrite_links(link.get_header_mut(), links)?;
+
+        self.get_internal_links()
             .and_then(|links| {
-                debug!("Rewriting own links for {:?}, without {:?}", other_loc, own_loc);
-                let links = links.filter(|l| !l.eq_store_id(own_loc));
-                rewrite_links(link.get_header_mut(), links)
-            })
-            .and_then(|_| {
-                self.get_internal_links()
-                    .and_then(|links| {
-                        debug!("Rewriting own links for {:?}, without {:?}", own_loc, other_loc);
-                        let links = links.filter(|l| !l.eq_store_id(other_loc));
-                        rewrite_links(self.get_header_mut(), links)
-                    })
+                debug!("Rewriting own links for {:?}, without {:?}", own_loc, other_loc);
+                let links = links.filter(|l| !l.eq_store_id(other_loc));
+                rewrite_links(self.get_header_mut(), links)
             })
     }
 
