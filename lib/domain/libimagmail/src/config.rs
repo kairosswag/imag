@@ -53,7 +53,7 @@ impl MailConfig {
     }
 
     pub fn postfetchcommand(&self) -> Option<&String> {
-        &self.postfetchcommand
+        self.postfetchcommand.as_ref()
     }
 
     pub fn sendcommand(&self) -> &String {
@@ -61,51 +61,47 @@ impl MailConfig {
     }
 
     pub fn postsendcommand(&self) -> Option<&String> {
-        &self.postsendcommand
+        self.postsendcommand.as_ref()
     }
 
     pub fn fetchcommand_for_account(&self, account_name: &str) -> &String {
         self.accounts()
             .iter()
-            .filter(|a| a.name == account_name())
-            .map(|a| a.fetchcommand)
+            .filter(|a| a.name == account_name)
             .next()
-            .unwrap_or_else(|| {
-                self.fetchcommand()
-            })
+            .and_then(|a| a.fetchcommand)
+            .as_ref()
+            .unwrap_or_else(|| self.fetchcommand())
     }
 
     pub fn postfetchcommand_for_account(&self, account_name: &str) -> Option<&String> {
         self.accounts()
             .iter()
-            .filter(|a| a.name == account_name())
+            .filter(|a| a.name == account_name)
             .next()
             .and_then(|a| a.postfetchcommand)
-            .unwrap_or_else(|| {
-                self.fetchcommand()
-            })
+            .as_ref()
+            .or_else(|| self.postfetchcommand())
     }
 
     pub fn sendcommand_for_account(&self, account_name: &str) -> &String {
         self.accounts()
             .iter()
-            .filter(|a| a.name == account_name())
-            .map(|a| a.sendcommand)
+            .filter(|a| a.name == account_name)
             .next()
-            .unwrap_or_else(|| {
-                self.sendcommand()
-            })
+            .and_then(|a| a.sendcommand)
+            .as_ref()
+            .unwrap_or_else(|| self.sendcommand())
     }
 
     pub fn postsendcommand_for_account(&self, account_name: &str) -> Option<&String> {
         self.accounts()
             .iter()
-            .filter(|a| a.name == account_name())
+            .filter(|a| a.name == account_name)
             .next()
             .and_then(|a| a.postsendcommand)
-            .unwrap_or_else(|| {
-                self.postsendcommand()
-            })
+            .as_ref()
+            .or_else(|| self.postsendcommand())
     }
 
 }
